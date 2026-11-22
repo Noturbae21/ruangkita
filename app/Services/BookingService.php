@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Exceptions\DomainException;
+use App\Models\AdditionalFacility;
 use App\Models\Booking;
+use App\Models\BookingAdditionalFacility;
 use App\Models\Room;
 use App\Support\Clock;
 use Carbon\Carbon;
@@ -20,7 +22,8 @@ class BookingService
     public const PENALTY_RATE = 0.5;
 
     /**
-     * Create a new booking enforcing FR-07, FR-08, and BR-01 through BR-07.
+     * Create a new booking enforcing FR-07, FR-08, and BR-01 through BR-07,
+     * including optional paid additional facilities (add-ons).
      */
     public function createBooking(array $payload, ?Carbon $nowUtc = null): Booking
     {
@@ -34,6 +37,8 @@ class BookingService
             throw new DomainException('Jumlah peserta harus berupa bilangan bulat.', 400, 'INVALID_INPUT');
         }
 
+        $requestedAddons = $this->normalizeRequestedAdditionalFacilities($payload['additional_facilities'] ?? []);
+
         [$startUtc, $endUtc, $startWib, $endWib] = $this->parseBookingTimes($payload);
 
         $room = Room::find($roomId);
@@ -43,7 +48,7 @@ class BookingService
 
         $this->validateBusinessRules($room, $startUtc, $endUtc, $startWib, $endWib, $participants, $nowUtc);
 
-        return DB::transaction(function () use ($roomId, $payload, $startUtc, $endUtc, $startWib, $endWib, $participants, $nowUtc) {
+        return DB::transaction(function () use ($roomId, $payload, $startUtc, $endUtc, $startWib, $endWib, $participants, $nowUtc, $requestedAddons) {
             $lockedRoom = Room::where('id', $roomId)->lockForUpdate()->first();
             if (! $lockedRoom) {
                 throw new DomainException('Ruang tidak ditemukan.', 404, 'ROOM_NOT_FOUND');
@@ -67,27 +72,247 @@ class BookingService
                 );
             }
 
-            // FR-08: Server calculates total price = duration (hours) * price_per_hour
+            // FR-08: Server calculates room price + additional facilities price
             $durationMinutes = $startUtc->diffInMinutes($endUtc);
-            $totalPrice = (int) round(($durationMinutes / 60) * $lockedRoom->price_per_hour);
+            $roomPrice = (int) round(($durationMinutes / 60) * $lockedRoom->price_per_hour);
+
+            $resolvedAddonItems = $this->resolveAdditionalFacilities($requestedAddons, $durationMinutes, $participants);
+            $addonsPrice = array_sum(array_column($resolvedAddonItems, 'subtotal'));
+            $totalPrice = $roomPrice + $addonsPrice;
+
+            $bookingCode = $this->generateUniqueBookingCode($startWib);
+            $paymentReference = 'QRIS-RK-' . strtoupper(substr(md5($bookingCode . microtime(true)), 0, 10));
+            $qrisPayload = self::buildQrisPayload($bookingCode, $totalPrice);
+            $paymentExpiredUtc = $nowUtc->copy()->addMinutes(15);
 
             $booking = Booking::create([
+                'booking_code' => $bookingCode,
                 'room_id' => $lockedRoom->id,
                 'booker_name' => trim((string) $payload['booker_name']),
                 'booker_contact' => trim((string) $payload['booker_contact']),
                 'start_time' => $startUtc->format('Y-m-d H:i:s'),
                 'end_time' => $endUtc->format('Y-m-d H:i:s'),
                 'participants' => $participants,
+                'room_price' => $roomPrice,
+                'additional_facilities_price' => $addonsPrice,
                 'total_price' => $totalPrice,
+                'payment_method' => Booking::PAYMENT_METHOD_QRIS,
+                'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
+                'payment_reference' => $paymentReference,
+                'qris_payload' => $qrisPayload,
+                'payment_expired_at' => $paymentExpiredUtc->format('Y-m-d H:i:s'),
+                'paid_at' => null,
                 'status' => Booking::STATUS_CONFIRMED,
                 'cancelled_at' => null,
                 'penalty_amount' => 0,
             ]);
 
+            $createdItems = collect();
+            foreach ($resolvedAddonItems as $itemData) {
+                $createdItems->push(BookingAdditionalFacility::create(array_merge(
+                    ['booking_id' => $booking->id],
+                    $itemData
+                )));
+            }
+
             $booking->setRelation('room', $lockedRoom);
+            $booking->setRelation('additionalFacilities', $createdItems);
 
             return $booking;
         });
+    }
+
+    /**
+     * Pay a booking via QRIS Payment Gateway.
+     */
+    public function payBookingWithQris(int $bookingId, ?Carbon $nowUtc = null): Booking
+    {
+        $nowUtc = ($nowUtc ?? Clock::now())->copy()->utc();
+
+        return DB::transaction(function () use ($bookingId, $nowUtc) {
+            $booking = Booking::with(['room', 'additionalFacilities'])->where('id', $bookingId)->lockForUpdate()->first();
+
+            if (! $booking) {
+                throw new DomainException('Booking tidak ditemukan.', 404, 'BOOKING_NOT_FOUND');
+            }
+
+            if ($booking->status === Booking::STATUS_CANCELLED) {
+                throw new DomainException(
+                    'Booking yang sudah dibatalkan tidak dapat dilakukan pembayaran QRIS.',
+                    422,
+                    'PAYMENT_BOOKING_CANCELLED'
+                );
+            }
+
+            if ($booking->payment_status === Booking::PAYMENT_STATUS_PAID) {
+                throw new DomainException(
+                    'Booking ini sudah lunas dibayar melalui QRIS.',
+                    422,
+                    'PAYMENT_ALREADY_PAID'
+                );
+            }
+
+            $bookingCode = $booking->booking_code ?: sprintf('RK-%s-%04d', $nowUtc->format('Ymd'), $booking->id);
+            $paymentReference = $booking->payment_reference ?: ('QRIS-RK-' . strtoupper(substr(md5($bookingCode . $booking->id), 0, 10)));
+            $qrisPayload = $booking->qris_payload ?: self::buildQrisPayload($bookingCode, (int) $booking->total_price);
+
+            $booking->update([
+                'booking_code' => $bookingCode,
+                'payment_method' => Booking::PAYMENT_METHOD_QRIS,
+                'payment_status' => Booking::PAYMENT_STATUS_PAID,
+                'payment_reference' => $paymentReference,
+                'qris_payload' => $qrisPayload,
+                'paid_at' => $nowUtc->format('Y-m-d H:i:s'),
+            ]);
+
+            return $booking->fresh(['room', 'additionalFacilities']);
+        });
+    }
+
+    /**
+     * Generate a unique booking reference code (e.g. RK-20261125-A8F2).
+     */
+    protected function generateUniqueBookingCode(Carbon $startWib): string
+    {
+        $datePart = $startWib->format('Ymd');
+        do {
+            $randomPart = strtoupper(substr(bin2hex(random_bytes(3)), 0, 4));
+            $code = "RK-{$datePart}-{$randomPart}";
+        } while (Booking::where('booking_code', $code)->exists());
+
+        return $code;
+    }
+
+    /**
+     * Build a standard EMVCo / QRIS-formatted payload string with CRC16 checksum.
+     */
+    public static function buildQrisPayload(string $bookingCode, int $amount): string
+    {
+        $amountStr = (string) max(0, $amount);
+        $amountTag = '54' . str_pad((string) strlen($amountStr), 2, '0', STR_PAD_LEFT) . $amountStr;
+        $refTag = '05' . str_pad((string) strlen($bookingCode), 2, '0', STR_PAD_LEFT) . $bookingCode;
+        $additionalData = '62' . str_pad((string) strlen($refTag), 2, '0', STR_PAD_LEFT) . $refTag;
+
+        $basePayload = '00020101021226580014ID.CO.QRIS.WWW01189360091430000123450209RUANGKITA0303UMI520473995303360'
+            . $amountTag
+            . '5802ID5919RUANGKITA COWORKING6013JAKARTA PUSAT'
+            . $additionalData
+            . '6304';
+
+        $crc = strtoupper(str_pad(dechex(self::crc16Ccitt($basePayload)), 4, '0', STR_PAD_LEFT));
+
+        return $basePayload . $crc;
+    }
+
+    protected static function crc16Ccitt(string $data): int
+    {
+        $crc = 0xFFFF;
+        $len = strlen($data);
+        for ($i = 0; $i < $len; $i++) {
+            $crc ^= ord($data[$i]) << 8;
+            for ($j = 0; $j < 8; $j++) {
+                if (($crc & 0x8000) !== 0) {
+                    $crc = (($crc << 1) ^ 0x1021) & 0xFFFF;
+                } else {
+                    $crc = ($crc << 1) & 0xFFFF;
+                }
+            }
+        }
+
+        return $crc & 0xFFFF;
+    }
+
+    /**
+     * Normalize requested additional facilities payload into [facility_id => quantity].
+     *
+     * @return array<int, int>
+     */
+    protected function normalizeRequestedAdditionalFacilities(mixed $rawAddons): array
+    {
+        if ($rawAddons === null || $rawAddons === '' || $rawAddons === []) {
+            return [];
+        }
+
+        if (! is_array($rawAddons)) {
+            throw new DomainException("Field 'additional_facilities' harus berupa array.", 400, 'INVALID_INPUT');
+        }
+
+        $normalized = [];
+
+        foreach ($rawAddons as $entry) {
+            if (is_numeric($entry)) {
+                $facilityId = (int) $entry;
+                $quantity = 1;
+            } elseif (is_array($entry)) {
+                $rawId = $entry['id'] ?? $entry['additional_facility_id'] ?? null;
+                if ($rawId === null || ! is_numeric($rawId)) {
+                    throw new DomainException('ID fasilitas tambahan tidak valid.', 400, 'INVALID_INPUT');
+                }
+                $facilityId = (int) $rawId;
+                $rawQty = $entry['quantity'] ?? 1;
+                $quantity = filter_var($rawQty, FILTER_VALIDATE_INT);
+                if ($quantity === false || $quantity < 1) {
+                    throw new DomainException('Jumlah (quantity) fasilitas tambahan minimal 1.', 400, 'INVALID_INPUT');
+                }
+            } else {
+                throw new DomainException('Format item fasilitas tambahan tidak valid.', 400, 'INVALID_INPUT');
+            }
+
+            if ($facilityId <= 0) {
+                throw new DomainException('ID fasilitas tambahan tidak valid.', 400, 'INVALID_INPUT');
+            }
+
+            $normalized[$facilityId] = ($normalized[$facilityId] ?? 0) + $quantity;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Validate and compute subtotals for requested additional facilities.
+     *
+     * @param  array<int, int>  $requestedAddons
+     * @return array<int, array<string, mixed>>
+     */
+    protected function resolveAdditionalFacilities(array $requestedAddons, int $durationMinutes, int $participants): array
+    {
+        if (empty($requestedAddons)) {
+            return [];
+        }
+
+        $facilityIds = array_keys($requestedAddons);
+        $facilities = AdditionalFacility::whereIn('id', $facilityIds)->get()->keyBy('id');
+
+        $resolved = [];
+        foreach ($requestedAddons as $facilityId => $quantity) {
+            /** @var AdditionalFacility|null $facility */
+            $facility = $facilities->get($facilityId);
+
+            if (! $facility) {
+                throw new DomainException("Fasilitas tambahan #{$facilityId} tidak ditemukan.", 404, 'ADDITIONAL_FACILITY_NOT_FOUND');
+            }
+
+            if (! $facility->is_active) {
+                throw new DomainException(
+                    "Fasilitas tambahan '{$facility->name}' sedang tidak aktif dan tidak dapat dipilih.",
+                    422,
+                    'ADDITIONAL_FACILITY_INACTIVE'
+                );
+            }
+
+            $subtotal = $facility->calculateSubtotal($quantity, $durationMinutes, $participants);
+
+            $resolved[] = [
+                'additional_facility_id' => $facility->id,
+                'facility_name' => $facility->name,
+                'pricing_type' => $facility->pricing_type,
+                'unit_price' => $facility->price,
+                'quantity' => $quantity,
+                'subtotal' => $subtotal,
+            ];
+        }
+
+        return $resolved;
     }
 
     /**
@@ -98,7 +323,7 @@ class BookingService
         $nowUtc = ($nowUtc ?? Clock::now())->copy()->utc();
 
         return DB::transaction(function () use ($bookingId, $nowUtc) {
-            $booking = Booking::with('room')->where('id', $bookingId)->lockForUpdate()->first();
+            $booking = Booking::with(['room', 'additionalFacilities'])->where('id', $bookingId)->lockForUpdate()->first();
 
             if (! $booking) {
                 throw new DomainException('Booking tidak ditemukan.', 404, 'BOOKING_NOT_FOUND');
@@ -137,7 +362,7 @@ class BookingService
                 'penalty_amount' => $penaltyAmount,
             ]);
 
-            return $booking->fresh('room');
+            return $booking->fresh(['room', 'additionalFacilities']);
         });
     }
 

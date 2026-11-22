@@ -49,7 +49,7 @@ class CalendarController extends Controller
 
         $rooms = $roomsQuery->get();
 
-        $bookingsQuery = Booking::with('room')
+        $bookingsQuery = Booking::with(['room', 'additionalFacilities'])
             ->where('status', Booking::STATUS_CONFIRMED)
             ->where('start_time', '<', $endDayWib->copy()->utc()->format('Y-m-d H:i:s'))
             ->where('end_time', '>', $startDayWib->copy()->utc()->format('Y-m-d H:i:s'))

@@ -20,7 +20,7 @@ class BookingController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Booking::with('room')->orderByDesc('start_time');
+        $query = Booking::with(['room', 'additionalFacilities'])->orderByDesc('start_time');
 
         if ($request->filled('room_id')) {
             $query->where('room_id', (int) $request->query('room_id'));
@@ -28,6 +28,14 @@ class BookingController extends Controller
 
         if ($request->filled('status')) {
             $query->where('status', strtoupper((string) $request->query('status')));
+        }
+
+        if ($request->filled('payment_status')) {
+            $query->where('payment_status', strtoupper((string) $request->query('payment_status')));
+        }
+
+        if ($request->filled('booking_code')) {
+            $query->where('booking_code', 'like', '%'.trim((string) $request->query('booking_code')).'%');
         }
 
         if ($request->filled('booker_contact')) {
@@ -73,7 +81,7 @@ class BookingController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $booking = Booking::with('room')->find($id);
+        $booking = Booking::with(['room', 'additionalFacilities'])->find($id);
 
         if (! $booking) {
             return response()->json([
@@ -83,6 +91,59 @@ class BookingController extends Controller
         }
 
         return response()->json([
+            'data' => $booking->toApiArray(),
+        ], 200);
+    }
+
+    /**
+     * Get QRIS payment details & payload for a booking.
+     */
+    public function qris(int $id): JsonResponse
+    {
+        $booking = Booking::with(['room', 'additionalFacilities'])->find($id);
+
+        if (! $booking) {
+            return response()->json([
+                'error' => 'BOOKING_NOT_FOUND',
+                'message' => 'Booking tidak ditemukan.',
+            ], 404);
+        }
+
+        $apiData = $booking->toApiArray();
+        if (empty($apiData['qris_payload'])) {
+            $apiData['qris_payload'] = BookingService::buildQrisPayload($apiData['booking_code'], (int) $booking->total_price);
+        }
+
+        return response()->json([
+            'data' => [
+                'booking_id' => $booking->id,
+                'booking_code' => $apiData['booking_code'],
+                'merchant_name' => 'RUANGKITA COWORKING SPACE',
+                'nmid' => 'ID1026000914300',
+                'payment_method' => Booking::PAYMENT_METHOD_QRIS,
+                'payment_status' => $apiData['payment_status'],
+                'payment_reference' => $apiData['payment_reference'] ?: ('QRIS-RK-' . $booking->id),
+                'total_price' => $booking->total_price,
+                'room_price' => $apiData['room_price'],
+                'additional_facilities_price' => $apiData['additional_facilities_price'],
+                'qris_payload' => $apiData['qris_payload'],
+                'payment_expired_at' => $apiData['payment_expired_at'],
+                'paid_at' => $apiData['paid_at'],
+                'booking' => $apiData,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Confirm/simulate QRIS payment settlement for a booking.
+     */
+    public function pay(Request $request, int $id): JsonResponse
+    {
+        $nowUtc = Clock::now($request);
+        $booking = $this->bookingService->payBookingWithQris($id, $nowUtc);
+
+        return response()->json([
+            'message' => 'Pembayaran QRIS berhasil diverifikasi dan lunas.',
             'data' => $booking->toApiArray(),
         ], 200);
     }
