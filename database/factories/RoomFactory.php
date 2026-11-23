@@ -17,6 +17,9 @@ class RoomFactory extends Factory
         return [
             'name' => 'Ruang '.fake()->unique()->city(),
             'capacity' => fake()->randomElement([6, 8, 10, 12, 20]),
+            'length_m' => 6.0,
+            'width_m' => 4.0,
+            'layout_type' => Room::LAYOUT_BOARDROOM,
             'facilities' => ['WiFi', 'Proyektor', 'Whiteboard', 'AC'],
             'price_per_hour' => fake()->randomElement([100000, 150000, 200000, 250000]),
             'is_active' => true,

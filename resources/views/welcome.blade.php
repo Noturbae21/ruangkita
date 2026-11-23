@@ -194,6 +194,39 @@
                         <p id="bf-room-meta" class="text-xs text-slate-500 mt-1.5"></p>
                     </div>
 
+                    <!-- Visual Denah & Dimensi Ruang (Interactive Blueprint) -->
+                    <div id="bf-room-layout-card" class="rounded-2xl border border-indigo-200/80 bg-gradient-to-b from-slate-900 to-indigo-950 text-white p-4 space-y-3 shadow-sm">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2.5">
+                            <div>
+                                <span class="text-[10px] font-extrabold uppercase tracking-widest text-indigo-300 block">Visualisasi Denah &amp; Tata Letak</span>
+                                <h3 id="bf-layout-room-title" class="text-sm font-extrabold text-white">Memuat denah ruang...</h3>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <span id="bf-layout-dim-badge" class="px-2 py-0.5 rounded-md bg-indigo-500/25 border border-indigo-400/30 font-mono-code text-[11px] font-bold text-indigo-200">-</span>
+                                <span id="bf-layout-type-badge" class="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/30 text-[10px] font-extrabold text-emerald-300">-</span>
+                            </div>
+                        </div>
+
+                        <!-- Dynamic SVG Floor Plan Container -->
+                        <div id="bf-layout-svg-container" class="w-full bg-slate-950/60 rounded-xl border border-white/10 p-2.5 flex items-center justify-center min-h-[175px]">
+                        </div>
+
+                        <!-- Floor Plan Legend & Occupancy Indicator -->
+                        <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-300 pt-0.5">
+                            <div class="flex items-center gap-3">
+                                <span class="inline-flex items-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block shadow-xs shadow-emerald-400/50"></span>
+                                    <span>Kursi Terisi (<strong id="bf-layout-occupied-count" class="text-white">0</strong>)</span>
+                                </span>
+                                <span class="inline-flex items-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-slate-600 border border-slate-400 inline-block"></span>
+                                    <span>Kursi Kosong (<strong id="bf-layout-empty-count" class="text-white">0</strong>)</span>
+                                </span>
+                            </div>
+                            <span id="bf-layout-area-label" class="font-mono-code text-[11px] text-indigo-300 font-semibold">Luas: - m²</span>
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div class="sm:col-span-1">
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Tanggal (WIB)</label>
@@ -851,20 +884,38 @@
                 const facilitiesHtml = (room.facilities || []).map(f =>
                     `<span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-medium">${f}</span>`
                 ).join('');
+                const dimText = room.dimensions_label || `${room.length_m || 6}m × ${room.width_m || 4}m`;
+                const areaText = room.area_sqm || Math.round((room.length_m || 6) * (room.width_m || 4) * 10) / 10;
+                const layoutLabel = room.layout_label || room.layout_type || 'Boardroom';
 
                 return `
                     <div class="rounded-2xl border ${room.is_active ? 'border-slate-200 bg-white' : 'border-slate-200 bg-slate-50 opacity-75'} p-4 flex flex-col justify-between gap-3 hover:border-indigo-300 transition">
-                        <div class="space-y-2">
+                        <div class="space-y-2.5">
                             <div class="flex items-start justify-between gap-2">
                                 <div>
                                     <h3 class="font-extrabold text-slate-900 text-base">${room.name}</h3>
-                                    <p class="text-xs text-slate-500 font-medium">Kapasitas maks. <strong class="text-slate-800">${room.capacity} peserta</strong></p>
+                                    <p class="text-xs text-slate-500 font-medium">
+                                        Kapasitas maks. <strong class="text-slate-800">${room.capacity} peserta</strong>
+                                        • Dimensi <strong class="font-mono-code text-indigo-700">${dimText}</strong> (${areaText} m²)
+                                    </p>
                                 </div>
                                 <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold ${room.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}">
                                     ${room.is_active ? 'Tersedia' : 'Nonaktif'}
                                 </span>
                             </div>
-                            <div class="flex flex-wrap gap-1.5 pt-1">${facilitiesHtml}</div>
+
+                            <!-- Mini Room Blueprint Preview -->
+                            <div class="rounded-xl bg-slate-900 p-2 border border-slate-800">
+                                <div class="flex items-center justify-between text-[10px] text-slate-300 px-1 pb-1">
+                                    <span class="font-bold text-indigo-300">Layout: ${layoutLabel}</span>
+                                    <span class="font-mono-code">${dimText} (${areaText} m²)</span>
+                                </div>
+                                <div class="h-28 w-full flex items-center justify-center">
+                                    ${generateRoomBlueprintSvg(room, room.capacity, true)}
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap gap-1.5 pt-0.5">${facilitiesHtml}</div>
                         </div>
 
                         <div class="flex items-center justify-between pt-3 border-t border-slate-100">
@@ -875,7 +926,7 @@
                             ${room.is_active ? `
                                 <button type="button" onclick="selectRoomForBooking(${room.id})"
                                     class="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white transition cursor-pointer">
-                                    Pilih Ruang Ini
+                                    Pilih &amp; Lihat Denah
                                 </button>
                             ` : `<span class="text-xs text-slate-400 font-semibold">Tidak dapat dipesan</span>`}
                         </div>
@@ -901,6 +952,178 @@
             return h * 60 + m;
         }
 
+        function generateRoomBlueprintSvg(room, occupiedParticipants = 0, compact = false) {
+            const lengthM = Number(room.length_m || 6.0);
+            const widthM = Number(room.width_m || 4.0);
+            const cap = Math.max(1, Number(room.capacity || 8));
+            const occupied = Math.max(0, Math.min(cap, Number(occupiedParticipants || 0)));
+            const layoutType = String(room.layout_type || 'BOARDROOM').toUpperCase();
+
+            // Canvas coordinate space: 360 x 210
+            const W = 360;
+            const H = 210;
+            const rx = 38, ry = 26, rw = 284, rh = 152;
+
+            // Compute seat coordinates based on layoutType & capacity
+            const seats = [];
+            let tableSvg = '';
+
+            if (layoutType === 'U_SHAPE') {
+                // U-shape table opening towards left screen
+                tableSvg = `
+                    <path d="M 115 62 H 265 V 142 H 115 V 124 H 245 V 80 H 115 Z"
+                        fill="#1e293b" stroke="#6366f1" stroke-width="1.8" />
+                    <text x="188" y="106" text-anchor="middle" fill="#94a3b8" font-size="8" font-family="monospace">MEJA U-SHAPE</text>
+                `;
+                const topCount = Math.ceil((cap - 2) / 2);
+                const bottomCount = Math.max(1, cap - 2 - topCount);
+                for (let i = 0; i < topCount; i++) {
+                    const x = 128 + (i * (125 / Math.max(1, topCount - 1 || 1)));
+                    seats.push({ x, y: 49 });
+                }
+                seats.push({ x: 279, y: 84 });
+                seats.push({ x: 279, y: 120 });
+                for (let i = 0; i < bottomCount; i++) {
+                    const x = 128 + (i * (125 / Math.max(1, bottomCount - 1 || 1)));
+                    seats.push({ x, y: 155 });
+                }
+            } else if (layoutType === 'CLASSROOM') {
+                // Classroom rows facing left screen
+                const cols = 2;
+                const rowsPerCol = Math.ceil(cap / (cols * 2));
+                tableSvg = `
+                    <rect x="135" y="54" width="18" height="96" rx="3" fill="#1e293b" stroke="#6366f1" stroke-width="1.5"/>
+                    <rect x="215" y="54" width="18" height="96" rx="3" fill="#1e293b" stroke="#6366f1" stroke-width="1.5"/>
+                `;
+                for (let i = 0; i < cap; i++) {
+                    const col = i % 2;
+                    const row = Math.floor(i / 2);
+                    const x = col === 0 ? 165 : 245;
+                    const y = 62 + (row * (82 / Math.max(1, rowsPerCol - 1 || 1)));
+                    seats.push({ x, y });
+                }
+            } else if (layoutType === 'POD') {
+                // Compact pod table
+                tableSvg = `
+                    <rect x="128" y="72" width="105" height="60" rx="18" fill="#1e293b" stroke="#6366f1" stroke-width="1.8"/>
+                    <text x="180" y="105" text-anchor="middle" fill="#94a3b8" font-size="8" font-family="monospace">HUDDLE TABLE</text>
+                `;
+                const topCount = Math.ceil(cap / 2);
+                const bottomCount = cap - topCount;
+                for (let i = 0; i < topCount; i++) {
+                    const x = 148 + (i * (65 / Math.max(1, topCount - 1 || 1)));
+                    seats.push({ x, y: 58 });
+                }
+                for (let i = 0; i < bottomCount; i++) {
+                    const x = 148 + (i * (65 / Math.max(1, bottomCount - 1 || 1)));
+                    seats.push({ x, y: 146 });
+                }
+            } else {
+                // Default BOARDROOM long conference table
+                tableSvg = `
+                    <rect x="108" y="72" width="150" height="60" rx="12" fill="#1e293b" stroke="#6366f1" stroke-width="1.8"/>
+                    <rect x="118" y="82" width="130" height="40" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+                    <text x="183" y="105" text-anchor="middle" fill="#94a3b8" font-size="8" font-weight="bold" font-family="monospace">MEJA RAPAT UTAMA</text>
+                `;
+                // Head & tail seats if capacity >= 6
+                const sideSeats = Math.max(2, cap - 2);
+                const topCount = Math.ceil(sideSeats / 2);
+                const bottomCount = sideSeats - topCount;
+
+                seats.push({ x: 93, y: 102 }); // Head of table
+                for (let i = 0; i < topCount; i++) {
+                    const x = 126 + (i * (114 / Math.max(1, topCount - 1 || 1)));
+                    seats.push({ x, y: 58 });
+                }
+                for (let i = 0; i < bottomCount; i++) {
+                    const x = 126 + (i * (114 / Math.max(1, bottomCount - 1 || 1)));
+                    seats.push({ x, y: 146 });
+                }
+                if (seats.length < cap) {
+                    seats.push({ x: 273, y: 102 }); // Tail of table
+                }
+            }
+
+            const seatsSvg = seats.slice(0, cap).map((s, idx) => {
+                const isOccupied = idx < occupied;
+                const fill = isOccupied ? '#34d399' : '#334155';
+                const stroke = isOccupied ? '#a7f3d0' : '#64748b';
+                return `
+                    <g>
+                        <circle cx="${s.x}" cy="${s.y}" r="7.5" fill="${fill}" stroke="${stroke}" stroke-width="1.6"/>
+                        <text x="${s.x}" y="${s.y + 2.5}" text-anchor="middle" fill="${isOccupied ? '#022c22' : '#cbd5e1'}" font-size="6.5" font-weight="bold" font-family="monospace">${idx + 1}</text>
+                    </g>
+                `;
+            }).join('');
+
+            return `
+                <svg viewBox="0 0 ${W} ${H}" class="w-full h-full max-h-44 select-none">
+                    <defs>
+                        <pattern id="grid-${room.id}-${compact ? 'c' : 'f'}" width="16" height="16" patternUnits="userSpaceOnUse">
+                            <path d="M 16 0 L 0 0 0 16" fill="none" stroke="#1e293b" stroke-width="0.7"/>
+                        </pattern>
+                    </defs>
+
+                    <!-- Dimension Top Arrow (Panjang / Length) -->
+                    <line x1="${rx}" y1="14" x2="${rx + rw}" y2="14" stroke="#818cf8" stroke-width="1.2" stroke-dasharray="3,2"/>
+                    <line x1="${rx}" y1="9" x2="${rx}" y2="19" stroke="#818cf8" stroke-width="1.5"/>
+                    <line x1="${rx + rw}" y1="9" x2="${rx + rw}" y2="19" stroke="#818cf8" stroke-width="1.5"/>
+                    <rect x="${rx + rw / 2 - 44}" y="5" width="88" height="16" rx="4" fill="#0f172a"/>
+                    <text x="${rx + rw / 2}" y="16" text-anchor="middle" fill="#a5b4fc" font-size="9" font-weight="bold" font-family="monospace">PANJANG ${lengthM}m</text>
+
+                    <!-- Dimension Left Arrow (Lebar / Width) -->
+                    <line x1="16" y1="${ry}" x2="16" y2="${ry + rh}" stroke="#818cf8" stroke-width="1.2" stroke-dasharray="3,2"/>
+                    <line x1="11" y1="${ry}" x2="21" y2="${ry}" stroke="#818cf8" stroke-width="1.5"/>
+                    <line x1="11" y1="${ry + rh}" x2="21" y2="${ry + rh}" stroke="#818cf8" stroke-width="1.5"/>
+                    <g transform="translate(15, ${ry + rh / 2}) rotate(-90)">
+                        <rect x="-36" y="-8" width="72" height="15" rx="4" fill="#0f172a"/>
+                        <text x="0" y="3" text-anchor="middle" fill="#a5b4fc" font-size="8.5" font-weight="bold" font-family="monospace">LEBAR ${widthM}m</text>
+                    </g>
+
+                    <!-- Outer Room Wall & Blueprint Grid -->
+                    <rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="8" fill="url(#grid-${room.id}-${compact ? 'c' : 'f'})" stroke="#6366f1" stroke-width="2.2"/>
+
+                    <!-- Screen / Smart TV & Whiteboard on Left Wall -->
+                    <rect x="${rx + 4}" y="${ry + 36}" width="7" height="80" rx="2" fill="#38bdf8"/>
+                    <text x="${rx + 17}" y="${ry + 78}" fill="#38bdf8" font-size="7" font-weight="bold" font-family="monospace" transform="rotate(-90, ${rx + 17}, ${ry + 78})">TV / PROYEKTOR</text>
+
+                    <!-- AC Unit on Top Wall -->
+                    <rect x="${rx + rw - 58}" y="${ry + 3}" width="42" height="6" rx="2" fill="#94a3b8"/>
+                    <text x="${rx + rw - 37}" y="${ry + 16}" text-anchor="middle" fill="#64748b" font-size="6.5" font-family="monospace">AC</text>
+
+                    <!-- Door on Bottom-Right Wall -->
+                    <line x1="${rx + rw - 44}" y1="${ry + rh}" x2="${rx + rw - 14}" y2="${ry + rh}" stroke="#0f172a" stroke-width="3"/>
+                    <path d="M ${rx + rw - 44} ${ry + rh} A 26 26 0 0 1 ${rx + rw - 18} ${ry + rh - 24} L ${rx + rw - 18} ${ry + rh}" fill="none" stroke="#fbbf24" stroke-width="1.2" stroke-dasharray="2,2"/>
+                    <text x="${rx + rw - 29}" y="${ry + rh + 11}" text-anchor="middle" fill="#fbbf24" font-size="7.5" font-weight="bold" font-family="monospace">PINTU</text>
+
+                    <!-- Main Conference Table -->
+                    ${tableSvg}
+
+                    <!-- Dynamic Participant Chairs -->
+                    ${seatsSvg}
+                </svg>
+            `;
+        }
+
+        function renderSelectedRoomBlueprint(room, participants) {
+            if (!room) return;
+            const lengthM = room.length_m || 6.0;
+            const widthM = room.width_m || 4.0;
+            const dimLabel = room.dimensions_label || `${lengthM}m × ${widthM}m`;
+            const areaSqm = room.area_sqm || Math.round(lengthM * widthM * 10) / 10;
+            const layoutLabel = room.layout_label || room.layout_type || 'Boardroom';
+            const occupied = Math.max(0, Math.min(room.capacity, Number(participants || 0)));
+            const empty = Math.max(0, room.capacity - occupied);
+
+            document.getElementById('bf-layout-room-title').textContent = `${room.name} (Kapasitas ${room.capacity} Kursi)`;
+            document.getElementById('bf-layout-dim-badge').textContent = dimLabel;
+            document.getElementById('bf-layout-type-badge').textContent = layoutLabel;
+            document.getElementById('bf-layout-area-label').textContent = `Luas: ${areaSqm} m²`;
+            document.getElementById('bf-layout-occupied-count').textContent = `${occupied} org`;
+            document.getElementById('bf-layout-empty-count').textContent = `${empty} kursi`;
+            document.getElementById('bf-layout-svg-container').innerHTML = generateRoomBlueprintSvg(room, occupied, false);
+        }
+
         function updatePricePreview() {
             const roomId = document.getElementById('bf-room').value;
             const room = state.rooms.find(r => String(r.id) === String(roomId));
@@ -920,7 +1143,11 @@
                 return;
             }
 
-            metaEl.textContent = `Kapasitas: maks. ${room.capacity} orang • Fasilitas Bawaan: ${(room.facilities || []).join(', ')}`;
+            const dimLabel = room.dimensions_label || `${room.length_m || 6}m × ${room.width_m || 4}m`;
+            const areaSqm = room.area_sqm || Math.round((room.length_m || 6) * (room.width_m || 4) * 10) / 10;
+            metaEl.textContent = `Kapasitas: maks. ${room.capacity} orang • Ukuran: ${dimLabel} (${areaSqm} m²) • Fasilitas Bawaan: ${(room.facilities || []).join(', ')}`;
+
+            renderSelectedRoomBlueprint(room, participants);
 
             const diffMinutes = timeToMinutes(end) - timeToMinutes(start);
             const hours = diffMinutes / 60;

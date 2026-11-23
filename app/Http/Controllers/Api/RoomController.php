@@ -75,6 +75,9 @@ class RoomController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'max:255'],
             'capacity' => ['required', 'integer', 'min:1'],
+            'length_m' => ['sometimes', 'numeric', 'min:1', 'max:100'],
+            'width_m' => ['sometimes', 'numeric', 'min:1', 'max:100'],
+            'layout_type' => ['sometimes', 'string', 'max:30'],
             'facilities' => ['nullable'],
             'price_per_hour' => ['required', 'numeric', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
@@ -91,6 +94,9 @@ class RoomController extends Controller
         $room = Room::create([
             'name' => trim((string) $request->input('name')),
             'capacity' => (int) $request->input('capacity'),
+            'length_m' => (float) $request->input('length_m', 6.0),
+            'width_m' => (float) $request->input('width_m', 4.0),
+            'layout_type' => strtoupper(trim((string) $request->input('layout_type', Room::LAYOUT_BOARDROOM))),
             'facilities' => $request->input('facilities', []),
             'price_per_hour' => (int) round((float) $request->input('price_per_hour')),
             'is_active' => $request->has('is_active') ? (bool) $request->boolean('is_active') : true,
@@ -138,6 +144,9 @@ class RoomController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'capacity' => ['sometimes', 'required', 'integer', 'min:1'],
+            'length_m' => ['sometimes', 'required', 'numeric', 'min:1', 'max:100'],
+            'width_m' => ['sometimes', 'required', 'numeric', 'min:1', 'max:100'],
+            'layout_type' => ['sometimes', 'required', 'string', 'max:30'],
             'facilities' => ['nullable'],
             'price_per_hour' => ['sometimes', 'required', 'numeric', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
@@ -156,6 +165,15 @@ class RoomController extends Controller
         }
         if ($request->has('capacity')) {
             $room->capacity = (int) $request->input('capacity');
+        }
+        if ($request->has('length_m')) {
+            $room->length_m = (float) $request->input('length_m');
+        }
+        if ($request->has('width_m')) {
+            $room->width_m = (float) $request->input('width_m');
+        }
+        if ($request->has('layout_type')) {
+            $room->layout_type = strtoupper(trim((string) $request->input('layout_type')));
         }
         if ($request->has('facilities')) {
             $room->facilities = $request->input('facilities', []);

@@ -744,4 +744,37 @@ class RuangKitaBackendTest extends TestCase
             ->assertStatus(422)
             ->assertJsonPath('error', 'PAYMENT_ALREADY_PAID');
     }
+
+    /**
+     * T-17: Room dimensions (length_m, width_m, area_sqm) and layout_type are returned and configurable.
+     */
+    public function test_t17_room_dimensions_and_layout_blueprint_attributes(): void
+    {
+        $resp = $this->postJson('/api/rooms', [
+            'name' => 'Ruang Krakatau',
+            'capacity' => 16,
+            'length_m' => 9.5,
+            'width_m' => 6.0,
+            'layout_type' => 'U_SHAPE',
+            'facilities' => ['Dual TV', 'WiFi', 'AC'],
+            'price_per_hour' => 300000,
+            'is_active' => true,
+        ])->assertStatus(201)
+            ->assertJsonPath('data.length_m', 9.5)
+            ->assertJsonPath('data.width_m', 6)
+            ->assertJsonPath('data.area_sqm', 57)
+            ->assertJsonPath('data.dimensions_label', '9.5m × 6m')
+            ->assertJsonPath('data.layout_type', 'U_SHAPE');
+
+        $roomId = $resp->json('data.id');
+
+        $this->putJson("/api/rooms/{$roomId}", [
+            'length_m' => 10.0,
+            'width_m' => 7.0,
+            'layout_type' => 'CLASSROOM',
+        ])->assertStatus(200)
+            ->assertJsonPath('data.area_sqm', 70)
+            ->assertJsonPath('data.dimensions_label', '10m × 7m')
+            ->assertJsonPath('data.layout_type', 'CLASSROOM');
+    }
 }
