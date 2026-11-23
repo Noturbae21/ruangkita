@@ -28,40 +28,52 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $nusantara = Room::firstOrCreate(
+        $nusantara = Room::updateOrCreate(
             ['name' => 'Ruang Nusantara'],
             [
                 'capacity' => 12,
+                'length_m' => 8.0,
+                'width_m' => 5.0,
+                'layout_type' => Room::LAYOUT_BOARDROOM,
                 'facilities' => ['Smart TV 65"', 'Proyektor HD', 'Whiteboard', 'High-Speed WiFi', 'AC', 'Video Conference'],
                 'price_per_hour' => 200000,
                 'is_active' => true,
             ]
         );
 
-        $garuda = Room::firstOrCreate(
+        $garuda = Room::updateOrCreate(
             ['name' => 'Ruang Garuda'],
             [
                 'capacity' => 8,
+                'length_m' => 6.0,
+                'width_m' => 4.0,
+                'layout_type' => Room::LAYOUT_BOARDROOM,
                 'facilities' => ['Smart TV 55"', 'Whiteboard', 'High-Speed WiFi', 'AC'],
                 'price_per_hour' => 150000,
                 'is_active' => true,
             ]
         );
 
-        $khatulistiwa = Room::firstOrCreate(
+        $khatulistiwa = Room::updateOrCreate(
             ['name' => 'Ruang Khatulistiwa'],
             [
                 'capacity' => 6,
+                'length_m' => 4.5,
+                'width_m' => 3.5,
+                'layout_type' => Room::LAYOUT_POD,
                 'facilities' => ['Monitor HDMI', 'Whiteboard', 'High-Speed WiFi', 'AC'],
                 'price_per_hour' => 100000,
                 'is_active' => true,
             ]
         );
 
-        $merapi = Room::firstOrCreate(
+        $merapi = Room::updateOrCreate(
             ['name' => 'Ruang Merapi'],
             [
                 'capacity' => 20,
+                'length_m' => 10.0,
+                'width_m' => 6.5,
+                'layout_type' => Room::LAYOUT_U_SHAPE,
                 'facilities' => ['Dual Proyektor', 'Sound System', 'Podium', 'Whiteboard', 'High-Speed WiFi', 'AC'],
                 'price_per_hour' => 350000,
                 'is_active' => true,

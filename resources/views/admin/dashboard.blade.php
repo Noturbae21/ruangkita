@@ -153,6 +153,29 @@
                         </div>
                     </div>
 
+                    <div class="grid grid-cols-3 gap-2.5">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Panjang (m)</label>
+                            <input type="number" id="rf-length" min="2" max="50" step="0.5" value="6.0" required
+                                class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:border-indigo-600 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Lebar (m)</label>
+                            <input type="number" id="rf-width" min="2" max="50" step="0.5" value="4.0" required
+                                class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:border-indigo-600 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Tipe Layout</label>
+                            <select id="rf-layout"
+                                class="w-full rounded-xl border border-slate-300 px-2.5 py-2 text-xs font-semibold focus:border-indigo-600 focus:outline-none">
+                                <option value="BOARDROOM">Boardroom</option>
+                                <option value="U_SHAPE">U-Shape</option>
+                                <option value="CLASSROOM">Classroom</option>
+                                <option value="POD">Huddle Pod</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div>
                         <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Daftar Fasilitas (Pisahkan koma)</label>
                         <input type="text" id="rf-facilities" placeholder="Smart TV, Proyektor, WiFi, Whiteboard, AC"
@@ -448,7 +471,10 @@
             tbody.innerHTML = adminState.rooms.map(r => `
                 <tr class="hover:bg-slate-50 transition">
                     <td class="py-3.5 px-4 font-mono-code text-xs font-bold text-slate-500">#${r.id}</td>
-                    <td class="py-3.5 px-4 font-bold text-slate-900">${r.name}</td>
+                    <td class="py-3.5 px-4">
+                        <span class="font-bold text-slate-900 block">${r.name}</span>
+                        <span class="text-[11px] font-mono-code text-indigo-600 font-semibold">${r.dimensions_label || ((r.length_m || 6) + 'm × ' + (r.width_m || 4) + 'm')} (${r.area_sqm || 24} m²) · ${r.layout_label || r.layout_type || 'Boardroom'}</span>
+                    </td>
                     <td class="py-3.5 px-4 text-xs font-semibold">${r.capacity} orang</td>
                     <td class="py-3.5 px-4 font-mono-code text-xs font-bold text-indigo-700">${formatRupiah(r.price_per_hour)}</td>
                     <td class="py-3.5 px-4 text-xs text-slate-600">${(r.facilities || []).join(', ')}</td>
@@ -471,6 +497,9 @@
             document.getElementById('rf-id').value = room.id;
             document.getElementById('rf-name').value = room.name;
             document.getElementById('rf-capacity').value = room.capacity;
+            document.getElementById('rf-length').value = room.length_m || 6.0;
+            document.getElementById('rf-width').value = room.width_m || 4.0;
+            document.getElementById('rf-layout').value = room.layout_type || 'BOARDROOM';
             document.getElementById('rf-price').value = room.price_per_hour;
             document.getElementById('rf-facilities').value = (room.facilities || []).join(', ');
             document.getElementById('rf-active').checked = !!room.is_active;
@@ -482,6 +511,9 @@
             document.getElementById('rf-id').value = '';
             document.getElementById('rf-name').value = '';
             document.getElementById('rf-capacity').value = '';
+            document.getElementById('rf-length').value = '6.0';
+            document.getElementById('rf-width').value = '4.0';
+            document.getElementById('rf-layout').value = 'BOARDROOM';
             document.getElementById('rf-price').value = '';
             document.getElementById('rf-facilities').value = '';
             document.getElementById('rf-active').checked = true;
@@ -496,6 +528,9 @@
             const payload = {
                 name: document.getElementById('rf-name').value,
                 capacity: Number(document.getElementById('rf-capacity').value),
+                length_m: Number(document.getElementById('rf-length').value || 6.0),
+                width_m: Number(document.getElementById('rf-width').value || 4.0),
+                layout_type: document.getElementById('rf-layout').value || 'BOARDROOM',
                 price_per_hour: Number(document.getElementById('rf-price').value),
                 facilities,
                 is_active: document.getElementById('rf-active').checked,
