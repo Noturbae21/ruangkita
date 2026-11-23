@@ -38,6 +38,35 @@
             background: #cbd5e1;
             border-radius: 9999px;
         }
+        @media print {
+            body {
+                background: #ffffff !important;
+                color: #0f172a !important;
+            }
+            header, section, main, footer, #toast-container, .no-print {
+                display: none !important;
+            }
+            #qris-modal {
+                position: static !important;
+                display: block !important;
+                background: transparent !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
+            }
+            #qris-modal-card {
+                max-width: 100% !important;
+                width: 100% !important;
+                box-shadow: none !important;
+                border: 1px solid #cbd5e1 !important;
+                margin: 0 !important;
+                border-radius: 12px !important;
+            }
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col antialiased selection:bg-indigo-600 selection:text-white">
@@ -63,9 +92,14 @@
                 </div>
             </div>
 
-            <!-- Live Status, Clock & Admin Portal Link -->
+            <!-- Live Status, Clock & Customer Auth Controls -->
             <div class="flex items-center gap-2.5">
-                <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200/80 text-xs font-medium text-slate-700">
+                <a href="{{ route('home') }}"
+                    class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200/80 text-xs font-bold text-slate-700 transition">
+                    &larr; Beranda
+                </a>
+
+                <div class="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200/80 text-xs font-medium text-slate-700">
                     <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -73,13 +107,46 @@
                 </div>
 
                 <button onclick="checkHealth()" id="health-badge" title="Status Server & Database (GET /health)"
-                    class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold transition hover:bg-emerald-100 cursor-pointer">
+                    class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold transition hover:bg-emerald-100 cursor-pointer">
                     <span id="health-dot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     <span id="health-text">Sistem Online</span>
                 </button>
+
+                @if (session()->has('customer_id'))
+                    <div class="flex items-center gap-2 pl-1 border-l border-slate-200">
+                        <button type="button" onclick="switchTab('bookings-list')"
+                            class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 text-xs font-bold text-indigo-900 transition cursor-pointer">
+                            <span class="w-6 h-6 rounded-full bg-indigo-600 text-white text-[11px] font-extrabold flex items-center justify-center">
+                                {{ strtoupper(substr((string) session('customer_name', 'U'), 0, 1)) }}
+                            </span>
+                            <span class="max-w-[120px] truncate">{{ session('customer_name') }}</span>
+                        </button>
+                        <form method="POST" action="{{ route('customer.logout') }}">
+                            @csrf
+                            <button type="submit"
+                                class="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 text-xs font-bold transition cursor-pointer">
+                                Keluar
+                            </button>
+                        </form>
+                    </div>
+                @else
+                    <div class="flex items-center gap-1.5 pl-1 border-l border-slate-200">
+                        <a href="{{ route('customer.login') }}"
+                            class="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-bold transition">
+                            Masuk
+                        </a>
+                        <a href="{{ route('customer.register') }}"
+                            class="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-2xs transition">
+                            Daftar Akun
+                        </a>
+                    </div>
+                @endif
             </div>
         </div>
     </header>
+
+    <!-- Floating Toast Notification (Tetap terlihat saat pengguna scroll) -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 max-w-md w-full px-4 sm:px-0 pointer-events-none space-y-2"></div>
 
     <!-- Hero Banner (Khusus Pengguna / Pemesan) -->
     <section class="relative overflow-hidden bg-slate-900 text-white border-b border-slate-800">
@@ -144,7 +211,7 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                     </svg>
-                    <span>1. Buat Booking &amp; Cek Slot Kosong</span>
+                    <span>1. Buat Booking Baru (Wizard 5 Langkah)</span>
                 </button>
 
                 <button onclick="switchTab('calendar')" id="tab-btn-calendar"
@@ -161,6 +228,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
                     <span>3. Riwayat &amp; Pembatalan Booking</span>
+                    <span id="tab-bookings-count-badge" class="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-slate-100 text-slate-700">0</span>
                 </button>
             </nav>
 
@@ -172,214 +240,588 @@
             </button>
         </div>
 
-        <!-- TAB 1: BOOKING & CEK KETERSEDIAAN -->
-        <section id="tab-booking" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            <!-- Left Column: Form Booking (5 cols) -->
-            <div class="lg:col-span-5 bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-5">
-                <div class="flex items-center justify-between border-b border-slate-100 pb-4">
-                    <div>
-                        <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">Formulir Pemesan</span>
-                        <h2 class="text-lg font-extrabold text-slate-900">Pesan Ruang Meeting</h2>
-                    </div>
-                    <span class="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-semibold">Konfirmasi Instan</span>
+        <!-- TAB 1: BOOKING WIZARD (5 LANGKAH TERPISAH) -->
+        <section id="tab-booking" class="space-y-6">
+
+            <!-- Interactive 5-Step Progress Bar -->
+            <div class="bg-white rounded-3xl border border-slate-200/90 p-4 sm:p-5 shadow-2xs">
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5" id="wizard-progress-bar">
+                    <button type="button" onclick="goToBookingStep(1)" id="wiz-nav-1"
+                        class=" flex items-center gap-2.5 p-2.5 rounded-2xl border-2 border-indigo-600 bg-indigo-50/70 text-left transition cursor-pointer">
+                        <span id="wiz-circle-1" class="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-extrabold flex items-center justify-center shrink-0">1</span>
+                        <div class="min-w-0">
+                            <span class="block text-[10px] font-bold uppercase tracking-wider text-indigo-600">Langkah 1</span>
+                            <span class="block text-xs font-extrabold text-slate-900 truncate">Kategori &amp; Ruang</span>
+                        </div>
+                    </button>
+
+                    <button type="button" onclick="goToBookingStep(2)" id="wiz-nav-2"
+                        class="flex items-center gap-2.5 p-2.5 rounded-2xl border border-slate-200 bg-slate-50/60 hover:bg-slate-100 text-left transition cursor-pointer">
+                        <span id="wiz-circle-2" class="w-7 h-7 rounded-full bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center justify-center shrink-0">2</span>
+                        <div class="min-w-0">
+                            <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Langkah 2</span>
+                            <span class="block text-xs font-extrabold text-slate-700 truncate">Tanggal &amp; Jam</span>
+                        </div>
+                    </button>
+
+                    <button type="button" onclick="goToBookingStep(3)" id="wiz-nav-3"
+                        class="flex items-center gap-2.5 p-2.5 rounded-2xl border border-slate-200 bg-slate-50/60 hover:bg-slate-100 text-left transition cursor-pointer">
+                        <span id="wiz-circle-3" class="w-7 h-7 rounded-full bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center justify-center shrink-0">3</span>
+                        <div class="min-w-0">
+                            <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Langkah 3</span>
+                            <span class="block text-xs font-extrabold text-slate-700 truncate">Opsi Tambahan</span>
+                        </div>
+                    </button>
+
+                    <button type="button" onclick="goToBookingStep(4)" id="wiz-nav-4"
+                        class="flex items-center gap-2.5 p-2.5 rounded-2xl border border-slate-200 bg-slate-50/60 hover:bg-slate-100 text-left transition cursor-pointer">
+                        <span id="wiz-circle-4" class="w-7 h-7 rounded-full bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center justify-center shrink-0">4</span>
+                        <div class="min-w-0">
+                            <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Langkah 4</span>
+                            <span class="block text-xs font-extrabold text-slate-700 truncate">Isi Data Diri</span>
+                        </div>
+                    </button>
+
+                    <button type="button" onclick="goToBookingStep(5)" id="wiz-nav-5"
+                        class="col-span-2 sm:col-span-1 flex items-center gap-2.5 p-2.5 rounded-2xl border border-slate-200 bg-slate-50/60 hover:bg-slate-100 text-left transition cursor-pointer">
+                        <span id="wiz-circle-5" class="w-7 h-7 rounded-full bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center justify-center shrink-0">5</span>
+                        <div class="min-w-0">
+                            <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Langkah 5</span>
+                            <span class="block text-xs font-extrabold text-slate-700 truncate">Pembayaran QRIS</span>
+                        </div>
+                    </button>
                 </div>
+            </div>
 
-                <form id="booking-form" onsubmit="submitBooking(event)" class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Pilih Ruang Meeting</label>
-                        <select id="bf-room" required onchange="onBookingRoomOrDateChange()"
-                            class="w-full rounded-xl border border-slate-300 bg-slate-50/50 px-3.5 py-2.5 text-sm font-medium text-slate-900 focus:border-indigo-600 focus:bg-white focus:outline-none">
-                            <option value="">Memuat daftar ruang...</option>
-                        </select>
-                        <p id="bf-room-meta" class="text-xs text-slate-500 mt-1.5"></p>
-                    </div>
+            <!-- Wizard Main Grid: Left Active Step Screen (8 cols) + Right Sticky Live Summary (4 cols) -->
+            <form id="booking-form" onsubmit="submitBooking(event)" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-                    <!-- Visual Denah & Dimensi Ruang (Interactive Blueprint) -->
-                    <div id="bf-room-layout-card" class="rounded-2xl border border-indigo-200/80 bg-gradient-to-b from-slate-900 to-indigo-950 text-white p-4 space-y-3 shadow-sm">
-                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2.5">
+                <!-- LEFT 8 COLS: ACTIVE STEP CONTAINER -->
+                <div class="lg:col-span-8 space-y-6">
+
+                    <!-- ==================== LAYAR LANGKAH 1: PILIH KATEGORI & RUANGAN ==================== -->
+                    <div id="wizard-panel-1" class="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-6">
+                        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
                             <div>
-                                <span class="text-[10px] font-extrabold uppercase tracking-widest text-indigo-300 block">Visualisasi Denah &amp; Tata Letak</span>
-                                <h3 id="bf-layout-room-title" class="text-sm font-extrabold text-white">Memuat denah ruang...</h3>
+                                <span class="text-[11px] font-extrabold uppercase tracking-wider text-indigo-600">Langkah 1 dari 5</span>
+                                <h2 class="text-xl font-extrabold text-slate-900">Pilih Kategori &amp; Katalog Ruangan</h2>
+                                <p class="text-xs text-slate-500 mt-0.5">Tentukan jumlah peserta tim Anda dan pilih kategori ruangan, lalu klik salah satu kartu ruangan di katalog.</p>
                             </div>
-                            <div class="flex items-center gap-1.5">
-                                <span id="bf-layout-dim-badge" class="px-2 py-0.5 rounded-md bg-indigo-500/25 border border-indigo-400/30 font-mono-code text-[11px] font-bold text-indigo-200">-</span>
-                                <span id="bf-layout-type-badge" class="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/30 text-[10px] font-extrabold text-emerald-300">-</span>
+                            <span id="bf-capacity-status-badge" class="text-xs font-bold px-3 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">Kapasitas Sesuai</span>
+                        </div>
+
+                        <!-- 1A. Baris Pengaturan Jumlah Peserta & Filter Kategori Ruangan -->
+                        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                                <!-- Jumlah Peserta -->
+                                <div class="md:col-span-5">
+                                    <div class="flex items-center justify-between mb-1.5">
+                                        <label class="block text-xs font-extrabold text-slate-800 uppercase tracking-wider">1. Jumlah Peserta Rapat</label>
+                                        <div class="flex items-center gap-1">
+                                            <button type="button" onclick="setParticipantsCount(2)" class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-white border border-slate-200 hover:border-indigo-400 cursor-pointer">2</button>
+                                            <button type="button" onclick="setParticipantsCount(4)" class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-white border border-slate-200 hover:border-indigo-400 cursor-pointer">4</button>
+                                            <button type="button" onclick="setParticipantsCount(8)" class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-white border border-slate-200 hover:border-indigo-400 cursor-pointer">8</button>
+                                            <button type="button" onclick="setParticipantsCount(12)" class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-white border border-slate-200 hover:border-indigo-400 cursor-pointer">12</button>
+                                            <button type="button" onclick="setParticipantsToRoomMax()" class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 cursor-pointer">Maks</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" onclick="adjustParticipants(-1)"
+                                            class="w-10 h-10 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-extrabold text-base flex items-center justify-center transition cursor-pointer">−</button>
+                                        <input type="number" id="bf-participants" min="1" value="4" required oninput="onParticipantsInputChange()"
+                                            class="flex-1 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-extrabold text-center text-slate-900 focus:border-indigo-600 focus:outline-none">
+                                        <button type="button" onclick="adjustParticipants(1)"
+                                            class="w-10 h-10 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-extrabold text-base flex items-center justify-center transition cursor-pointer">+</button>
+                                    </div>
+                                </div>
+
+                                <!-- Pilihan Cepat Dropdown & Filter Hanya yang Muat -->
+                                <div class="md:col-span-7 flex flex-col justify-between gap-2">
+                                    <div>
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <label class="block text-xs font-extrabold text-slate-800 uppercase tracking-wider">Ruang Meeting Terpilih</label>
+                                            <label class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 cursor-pointer">
+                                                <input type="checkbox" id="filter-fit-participants" onchange="renderRoomsCatalog()" class="w-3.5 h-3.5 rounded text-indigo-600">
+                                                <span>Hanya tampilkan ruang yang muat</span>
+                                            </label>
+                                        </div>
+                                        <select id="bf-room" required onchange="onBookingRoomOrDateChange()"
+                                            class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 focus:border-indigo-600 focus:outline-none">
+                                            <option value="">Memuat daftar ruang...</option>
+                                        </select>
+                                        <p id="bf-room-meta" class="text-[11px] text-slate-500 mt-1 leading-relaxed"></p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 1B. Tab Kategori Ruangan -->
+                            <div class="pt-2 border-t border-slate-200/70">
+                                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                    <label class="block text-xs font-extrabold text-slate-800 uppercase tracking-wider">2. Filter Kategori Ruangan</label>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[11px] text-slate-500">Urutkan Katalog:</span>
+                                        <select id="catalog-sort-by" onchange="renderRoomsCatalog()"
+                                            class="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 focus:border-indigo-600 focus:outline-none">
+                                            <option value="recommended">Rekomendasi Kapasitas</option>
+                                            <option value="price_asc">Harga Terendah</option>
+                                            <option value="capacity_asc">Kapasitas Kecil &rarr; Besar</option>
+                                            <option value="capacity_desc">Kapasitas Besar &rarr; Kecil</option>
+                                        </select>
+                                        <input type="hidden" id="filter-min-capacity" value="">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5" id="bf-category-pills">
+                                    <button type="button" onclick="selectRoomCategory('ALL')" data-cat-pill="ALL"
+                                        class="cat-pill-btn p-3 rounded-2xl text-left border border-indigo-600 bg-indigo-600 text-white transition cursor-pointer">
+                                        <div class="flex items-center justify-between">
+                                            <span class="block text-xs font-extrabold">Semua Ruang</span>
+                                            <span id="cat-count-ALL" class="px-1.5 py-0.5 rounded-md bg-white/20 text-[10px] font-extrabold">0</span>
+                                        </div>
+                                        <span class="block text-[11px] opacity-85 mt-0.5">Seluruh kategori</span>
+                                    </button>
+                                    <button type="button" onclick="selectRoomCategory('SMALL')" data-cat-pill="SMALL"
+                                        class="cat-pill-btn p-3 rounded-2xl text-left border border-slate-200 bg-white text-slate-700 hover:border-indigo-400 transition cursor-pointer">
+                                        <div class="flex items-center justify-between">
+                                            <span class="block text-xs font-extrabold">Small / Pod</span>
+                                            <span id="cat-count-SMALL" class="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-extrabold">0</span>
+                                        </div>
+                                        <span class="block text-[11px] text-slate-500 mt-0.5">1 – 6 Orang · Diskusi</span>
+                                    </button>
+                                    <button type="button" onclick="selectRoomCategory('MEDIUM')" data-cat-pill="MEDIUM"
+                                        class="cat-pill-btn p-3 rounded-2xl text-left border border-slate-200 bg-white text-slate-700 hover:border-indigo-400 transition cursor-pointer">
+                                        <div class="flex items-center justify-between">
+                                            <span class="block text-xs font-extrabold">Medium / Boardroom</span>
+                                            <span id="cat-count-MEDIUM" class="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-extrabold">0</span>
+                                        </div>
+                                        <span class="block text-[11px] text-slate-500 mt-0.5">7 – 12 Orang · Rapat Tim</span>
+                                    </button>
+                                    <button type="button" onclick="selectRoomCategory('LARGE')" data-cat-pill="LARGE"
+                                        class="cat-pill-btn p-3 rounded-2xl text-left border border-slate-200 bg-white text-slate-700 hover:border-indigo-400 transition cursor-pointer">
+                                        <div class="flex items-center justify-between">
+                                            <span class="block text-xs font-extrabold">Large / Conference</span>
+                                            <span id="cat-count-LARGE" class="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-extrabold">0</span>
+                                        </div>
+                                        <span class="block text-[11px] text-slate-500 mt-0.5">&gt; 12 Orang · Workshop</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Dynamic SVG Floor Plan Container -->
-                        <div id="bf-layout-svg-container" class="w-full bg-slate-950/60 rounded-xl border border-white/10 p-2.5 flex items-center justify-center min-h-[175px]">
-                        </div>
-
-                        <!-- Floor Plan Legend & Occupancy Indicator -->
-                        <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-300 pt-0.5">
-                            <div class="flex items-center gap-3">
-                                <span class="inline-flex items-center gap-1.5">
-                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block shadow-xs shadow-emerald-400/50"></span>
-                                    <span>Kursi Terisi (<strong id="bf-layout-occupied-count" class="text-white">0</strong>)</span>
-                                </span>
-                                <span class="inline-flex items-center gap-1.5">
-                                    <span class="w-2.5 h-2.5 rounded-full bg-slate-600 border border-slate-400 inline-block"></span>
-                                    <span>Kursi Kosong (<strong id="bf-layout-empty-count" class="text-white">0</strong>)</span>
-                                </span>
+                        <!-- 1C. Katalog Kartu Ruangan (Pemilih Utama) -->
+                        <div class="space-y-3">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <h3 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider">3. Pilih Ruangan dari Katalog</h3>
+                                    <p id="catalog-summary-text" class="text-xs text-slate-500">Klik kartu ruangan untuk melihat simulasi kursi atau langsung klik "Pilih &amp; Lanjut".</p>
+                                </div>
                             </div>
-                            <span id="bf-layout-area-label" class="font-mono-code text-[11px] text-indigo-300 font-semibold">Luas: - m²</span>
+                            <div id="rooms-catalog-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                        </div>
+
+                        <!-- 1D. Visualisasi Denah Interaktif untuk Ruangan yang Sedang Dipilih -->
+                        <div id="bf-room-layout-card" class="rounded-2xl border border-indigo-200/80 bg-gradient-to-b from-slate-900 to-indigo-950 text-white p-4 space-y-3 shadow-sm">
+                            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2.5">
+                                <div>
+                                    <span class="text-[10px] font-extrabold uppercase tracking-widest text-indigo-300 block">Detail Denah &amp; Simulasi Kursi Ruangan Terpilih</span>
+                                    <h3 id="bf-layout-room-title" class="text-sm font-extrabold text-white">Memuat denah ruang...</h3>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <span id="bf-layout-dim-badge" class="px-2 py-0.5 rounded-md bg-indigo-500/25 border border-indigo-400/30 font-mono-code text-[11px] font-bold text-indigo-200">-</span>
+                                    <span id="bf-layout-type-badge" class="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/30 text-[10px] font-extrabold text-emerald-300">-</span>
+                                </div>
+                            </div>
+                            <div id="bf-layout-svg-container" class="w-full bg-slate-950/60 rounded-xl border border-white/10 p-2.5 flex items-center justify-center min-h-[175px]"></div>
+                            <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-300 pt-0.5">
+                                <div class="flex items-center gap-3">
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span>
+                                        <span>Kursi Terisi (<strong id="bf-layout-occupied-count" class="text-white">0</strong>)</span>
+                                    </span>
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <span class="w-2.5 h-2.5 rounded-full bg-slate-600 border border-slate-400 inline-block"></span>
+                                        <span>Kursi Kosong (<strong id="bf-layout-empty-count" class="text-white">0</strong>)</span>
+                                    </span>
+                                </div>
+                                <span id="bf-layout-area-label" class="font-mono-code text-[11px] text-indigo-300 font-semibold">Luas: - m²</span>
+                            </div>
+                        </div>
+
+                        <!-- Step 1 Footer Navigation -->
+                        <div class="flex items-center justify-end pt-4 border-t border-slate-100">
+                            <button type="button" onclick="goToBookingStep(2)"
+                                class="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-600/20 transition flex items-center gap-2 cursor-pointer">
+                                <span>Lanjut Pilih Tanggal &amp; Jam (Langkah 2)</span>
+                                <span>&rarr;</span>
+                            </button>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div class="sm:col-span-1">
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Tanggal (WIB)</label>
-                            <input type="date" id="bf-date" required onchange="onBookingRoomOrDateChange()"
-                                class="w-full rounded-xl border border-slate-300 bg-slate-50/50 px-3 py-2.5 text-sm font-medium text-slate-900 focus:border-indigo-600 focus:bg-white focus:outline-none">
+                    <!-- ==================== LAYAR LANGKAH 2: PILIH TANGGAL & JAM RAPAT ==================== -->
+                    <div id="wizard-panel-2" class="hidden bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-6">
+                        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                            <div>
+                                <span class="text-[11px] font-extrabold uppercase tracking-wider text-indigo-600">Langkah 2 dari 5</span>
+                                <h2 class="text-xl font-extrabold text-slate-900">Pilih Tanggal &amp; Jam Rapat (08:00 – 21:00 WIB)</h2>
+                                <p class="text-xs text-slate-500 mt-0.5">Pilih tanggal pemakaian dan klik slot waktu berwarna hijau yang masih kosong.</p>
+                            </div>
+                            <span id="avail-date-badge" class="px-3 py-1 rounded-xl bg-indigo-50 text-indigo-800 border border-indigo-200/70 text-xs font-bold"></span>
                         </div>
 
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Jam Mulai</label>
-                            <select id="bf-start" required onchange="updatePricePreview()"
-                                class="w-full rounded-xl border border-slate-300 bg-slate-50/50 px-3 py-2.5 text-sm font-mono-code font-medium text-slate-900 focus:border-indigo-600 focus:bg-white focus:outline-none">
-                            </select>
+                        <!-- 2A. Pilihan Tanggal & Jam -->
+                        <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-4">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Tanggal Pemakaian (WIB)</label>
+                                    <span id="bf-date-human-label" class="text-xs font-bold text-indigo-700">Hari Ini</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <button type="button" onclick="setBookingQuickDate(0)" id="bf-qdate-0"
+                                        class="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white transition cursor-pointer">Hari Ini</button>
+                                    <button type="button" onclick="setBookingQuickDate(1)" id="bf-qdate-1"
+                                        class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 transition cursor-pointer">Besok</button>
+                                    <button type="button" onclick="setBookingQuickDate(2)" id="bf-qdate-2"
+                                        class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 transition cursor-pointer">Lusa</button>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Pilih Tanggal</label>
+                                    <input type="date" id="bf-date" required onchange="onBookingRoomOrDateChange()"
+                                        class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:border-indigo-600 focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Jam Mulai</label>
+                                    <select id="bf-start" required onchange="onTimeSelectionChange()"
+                                        class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-mono-code font-bold text-slate-900 focus:border-indigo-600 focus:outline-none">
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Jam Selesai</label>
+                                    <select id="bf-end" required onchange="onTimeSelectionChange()"
+                                        class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-mono-code font-bold text-slate-900 focus:border-indigo-600 focus:outline-none">
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Pintasan Durasi -->
+                            <div>
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <span class="text-xs font-bold text-slate-600">Pintasan Durasi dari Jam Mulai:</span>
+                                    <span class="text-xs text-slate-400">Minimal 1 jam · Maksimal 8 jam</span>
+                                </div>
+                                <div class="grid grid-cols-5 gap-2">
+                                    <button type="button" onclick="setBookingDurationHours(1)" data-dur-btn="60"
+                                        class="dur-quick-btn py-2 px-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 hover:border-indigo-400 transition cursor-pointer">1 Jam</button>
+                                    <button type="button" onclick="setBookingDurationHours(2)" data-dur-btn="120"
+                                        class="dur-quick-btn py-2 px-2 rounded-xl text-xs font-bold border border-indigo-600 bg-indigo-600 text-white transition cursor-pointer">2 Jam</button>
+                                    <button type="button" onclick="setBookingDurationHours(3)" data-dur-btn="180"
+                                        class="dur-quick-btn py-2 px-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 hover:border-indigo-400 transition cursor-pointer">3 Jam</button>
+                                    <button type="button" onclick="setBookingDurationHours(4)" data-dur-btn="240"
+                                        class="dur-quick-btn py-2 px-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 hover:border-indigo-400 transition cursor-pointer">4 Jam</button>
+                                    <button type="button" onclick="setBookingDurationHours(8)" data-dur-btn="480"
+                                        class="dur-quick-btn py-2 px-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 hover:border-indigo-400 transition cursor-pointer">8 Jam</button>
+                                </div>
+                            </div>
                         </div>
 
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Jam Selesai</label>
-                            <select id="bf-end" required onchange="updatePricePreview()"
-                                class="w-full rounded-xl border border-slate-300 bg-slate-50/50 px-3 py-2.5 text-sm font-mono-code font-medium text-slate-900 focus:border-indigo-600 focus:bg-white focus:outline-none">
-                            </select>
+                        <!-- 2B. Peta Ketersediaan Slot 30 Menit -->
+                        <div class="space-y-3">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <p class="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Peta Slot Ketersediaan Ruang (Klik Slot untuk Memilih Jam Mulai)</p>
+                                    <p class="text-[11px] text-slate-500">Slot berwarna <strong class="text-indigo-700">Biru Indigo</strong> adalah rentang waktu yang sedang Anda pilih.</p>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-3 text-xs">
+                                    <span class="inline-flex items-center gap-1.5 text-indigo-700 font-bold"><span class="w-3 h-3 rounded-sm bg-indigo-600 inline-block"></span> Dipilih</span>
+                                    <span class="inline-flex items-center gap-1.5 text-emerald-700 font-semibold"><span class="w-3 h-3 rounded-sm bg-emerald-500 inline-block"></span> Kosong</span>
+                                    <span class="inline-flex items-center gap-1.5 text-rose-700 font-semibold"><span class="w-3 h-3 rounded-sm bg-rose-500 inline-block"></span> Terisi</span>
+                                </div>
+                            </div>
+                            <div id="avail-slots-grid" class="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-7 gap-2"></div>
+                        </div>
+
+                        <!-- 2C. Ringkasan Rentang Kosong & Terisi -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200/70">
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-emerald-800 mb-2 flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                    <span>Rentang Waktu Kosong (Klik untuk Pakai)</span>
+                                </h3>
+                                <div id="avail-free-ranges" class="space-y-1.5 text-xs text-emerald-950">
+                                    <p class="text-slate-400">Pilih ruang dan tanggal...</p>
+                                </div>
+                            </div>
+
+                            <div class="p-4 rounded-2xl bg-rose-50/60 border border-rose-200/70">
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-rose-800 mb-2 flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                                    <span>Slot Sudah Dipesan (Terisi)</span>
+                                </h3>
+                                <div id="avail-booked-ranges" class="space-y-1.5 text-xs text-rose-950">
+                                    <p class="text-slate-400">Belum ada booking pada tanggal ini.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 2 Footer Navigation -->
+                        <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
+                            <button type="button" onclick="goToBookingStep(1)"
+                                class="px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition cursor-pointer">
+                                &larr; Kembali Pilih Ruang
+                            </button>
+                            <button type="button" onclick="goToBookingStep(3)"
+                                class="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-600/20 transition flex items-center gap-2 cursor-pointer">
+                                <span>Lanjut Pilih Opsi Tambahan (Langkah 3)</span>
+                                <span>&rarr;</span>
+                            </button>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Jumlah Peserta</label>
-                            <input type="number" id="bf-participants" min="1" value="4" required oninput="updatePricePreview()"
-                                placeholder="Contoh: 6"
-                                class="w-full rounded-xl border border-slate-300 bg-slate-50/50 px-3.5 py-2.5 text-sm font-medium text-slate-900 focus:border-indigo-600 focus:bg-white focus:outline-none">
+                    <!-- ==================== LAYAR LANGKAH 3: PILIH OPSI TAMBAHAN KEBUTUHAN ==================== -->
+                    <div id="wizard-panel-3" class="hidden bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-6">
+                        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                            <div>
+                                <span class="text-[11px] font-extrabold uppercase tracking-wider text-indigo-600">Langkah 3 dari 5 · Opsional</span>
+                                <h2 class="text-xl font-extrabold text-slate-900">Pilih Opsi Tambahan Kebutuhan Rapat</h2>
+                                <p class="text-xs text-slate-500 mt-0.5">Tambahkan konsumsi (*coffee break* / makan siang) atau perangkat konferensi tambahan. Langkah ini opsional.</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span id="bf-addons-count-badge" class="text-xs font-bold px-3 py-1 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200/60">0 dipilih</span>
+                                <button type="button" id="bf-addons-reset-btn" onclick="clearSelectedAddons()" class="hidden text-xs font-bold text-rose-600 hover:underline cursor-pointer">Reset Pilihan</button>
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nama Pemesan</label>
-                            <input type="text" id="bf-name" required placeholder="Nama lengkap / tim"
-                                class="w-full rounded-xl border border-slate-300 bg-slate-50/50 px-3.5 py-2.5 text-sm font-medium text-slate-900 focus:border-indigo-600 focus:bg-white focus:outline-none">
-                        </div>
-                    </div>
 
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Kontak Pemesan (No. WhatsApp / Email)</label>
-                        <input type="text" id="bf-contact" required placeholder="0812xxxx atau email@perusahaan.com"
-                            class="w-full rounded-xl border border-slate-300 bg-slate-50/50 px-3.5 py-2.5 text-sm font-medium text-slate-900 focus:border-indigo-600 focus:bg-white focus:outline-none">
-                    </div>
-
-                    <!-- Pilihan Fasilitas Tambahan (Add-ons) -->
-                    <div class="space-y-2 pt-1">
-                        <div class="flex items-center justify-between">
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Fasilitas Tambahan (Opsional)</label>
-                            <span id="bf-addons-count-badge" class="text-[11px] font-semibold text-indigo-600">0 dipilih</span>
-                        </div>
-                        <div id="bf-addons-list" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                        <div id="bf-addons-list" class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <p class="text-xs text-slate-400">Memuat daftar fasilitas tambahan...</p>
                         </div>
+
+                        <!-- Step 3 Footer Navigation -->
+                        <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
+                            <button type="button" onclick="goToBookingStep(2)"
+                                class="px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition cursor-pointer">
+                                &larr; Kembali ke Tanggal &amp; Jam
+                            </button>
+                            <button type="button" onclick="goToBookingStep(4)"
+                                class="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-600/20 transition flex items-center gap-2 cursor-pointer">
+                                <span>Lanjut Isi Data Diri (Langkah 4)</span>
+                                <span>&rarr;</span>
+                            </button>
+                        </div>
                     </div>
 
-                    <!-- Server Price Estimation Box -->
-                    <div class="rounded-2xl bg-gradient-to-br from-indigo-50/90 to-slate-50 p-4 border border-indigo-100 space-y-2">
-                        <div class="flex items-center justify-between text-xs text-slate-600">
-                            <span>Durasi Rapat:</span>
-                            <span id="bf-duration-label" class="font-bold text-slate-800">2 Jam</span>
+                    <!-- ==================== LAYAR LANGKAH 4: ISI DATA DIRI PEMESAN ==================== -->
+                    <div id="wizard-panel-4" class="hidden bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-6">
+                        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                            <div>
+                                <span class="text-[11px] font-extrabold uppercase tracking-wider text-indigo-600">Langkah 4 dari 5</span>
+                                <h2 class="text-xl font-extrabold text-slate-900">Isi Data Diri Pemesan</h2>
+                                <p class="text-xs text-slate-500 mt-0.5">Masukkan nama lengkap atau nama tim beserta kontak aktif untuk penerbitan kode booking &amp; bukti pembayaran QRIS.</p>
+                            </div>
+                            @if (session()->has('customer_id'))
+                                <span class="px-3 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+                                    ✓ Terisi Otomatis dari Akun ({{ session('customer_email') }})
+                                </span>
+                            @endif
                         </div>
-                        <div class="flex items-center justify-between text-xs text-slate-600">
-                            <span>Biaya Sewa Ruang:</span>
-                            <span id="bf-room-price-preview" class="font-bold text-slate-800 font-mono-code">Rp 0</span>
+
+                        @if (! session()->has('customer_id'))
+                            <div class="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+                                <div class="space-y-0.5">
+                                    <p class="font-extrabold text-indigo-950">Punya Akun Penyewa RuangKita?</p>
+                                    <p class="text-slate-600">Masuk agar nama &amp; kontak terisi otomatis dan pesanan tersimpan di riwayat akun Anda.</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <a href="{{ route('customer.login') }}" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition">Masuk</a>
+                                    <a href="{{ route('customer.register') }}" class="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-indigo-700 border border-indigo-200 font-bold transition">Daftar</a>
+                                </div>
+                            </div>
+                        @endif
+
+                        <div class="space-y-4 max-w-xl">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Nama Lengkap Pemesan / Nama Tim</label>
+                                <input type="text" id="bf-name" value="{{ session('customer_name', '') }}" required oninput="updateWizardReviewSummary()" placeholder="Contoh: Budi Santoso / Tim Produk RuangKita"
+                                    class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 focus:border-indigo-600 focus:outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Kontak Pemesan (No. WhatsApp / Alamat Email)</label>
+                                <input type="text" id="bf-contact" value="{{ session('customer_phone', session('customer_email', '')) }}" required oninput="updateWizardReviewSummary()" placeholder="Contoh: 081234567890 atau budi@perusahaan.com"
+                                    class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 focus:border-indigo-600 focus:outline-none">
+                            </div>
                         </div>
-                        <div class="flex items-center justify-between text-xs text-slate-600">
-                            <span>Biaya Fasilitas Tambahan:</span>
-                            <span id="bf-addons-price-preview" class="font-bold text-indigo-700 font-mono-code">Rp 0</span>
+
+                        <!-- Step 4 Footer Navigation -->
+                        <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
+                            <button type="button" onclick="goToBookingStep(3)"
+                                class="px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition cursor-pointer">
+                                &larr; Kembali ke Opsi Tambahan
+                            </button>
+                            <button type="button" onclick="goToBookingStep(5)"
+                                class="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-600/20 transition flex items-center gap-2 cursor-pointer">
+                                <span>Lanjut ke Pembayaran QRIS (Langkah 5)</span>
+                                <span>&rarr;</span>
+                            </button>
                         </div>
-                        <div class="flex items-center justify-between pt-1.5 border-t border-indigo-200/60">
-                            <span class="text-xs font-bold uppercase tracking-wider text-indigo-900">Estimasi Total Biaya:</span>
-                            <span id="bf-price-preview" class="text-lg font-extrabold text-indigo-700 font-mono-code">Rp 0</span>
-                        </div>
-                        <p id="bf-rule-hint" class="text-[11px] text-slate-500 leading-tight">
-                            * Total harga dihitung otomatis oleh sistem berdasarkan sewa ruang + fasilitas tambahan.
-                        </p>
                     </div>
 
-                    <button type="submit" id="bf-submit-btn"
-                        class="w-full py-3 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-sm shadow-md shadow-indigo-600/20 transition flex items-center justify-center gap-2 cursor-pointer">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                        </svg>
-                        <span>Lanjut Pembayaran QRIS Sekarang</span>
-                    </button>
-                </form>
-            </div>
+                    <!-- ==================== LAYAR LANGKAH 5: KONFIRMASI & PEMBAYARAN QRIS ==================== -->
+                    <div id="wizard-panel-5" class="hidden bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-6">
+                        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                            <div>
+                                <span class="text-[11px] font-extrabold uppercase tracking-wider text-emerald-600">Langkah 5 dari 5 · Tahap Akhir</span>
+                                <h2 class="text-xl font-extrabold text-slate-900">Periksa Ringkasan &amp; Lanjut Pembayaran QRIS</h2>
+                                <p class="text-xs text-slate-500 mt-0.5">Pastikan seluruh rincian ruangan, jadwal, opsi tambahan, dan data diri di bawah sudah benar sebelum membuat kode QRIS.</p>
+                            </div>
+                            <span class="px-3 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-extrabold">Siap Dibayar via QRIS</span>
+                        </div>
 
-            <!-- Right Column: Cek Ketersediaan Ruang & Katalog Ruang (7 cols) -->
-            <div class="lg:col-span-7 space-y-6">
-                <!-- Availability Inspector Card -->
-                <div class="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-5">
-                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-4">
+                        <!-- Detailed Review Grid -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5 text-xs">
+                                <div class="flex items-center justify-between border-b border-slate-200/70 pb-2">
+                                    <span class="font-extrabold text-slate-700 uppercase tracking-wider">1. Ruang &amp; Jadwal</span>
+                                    <button type="button" onclick="goToBookingStep(1)" class="text-indigo-600 font-bold hover:underline cursor-pointer">Ubah</button>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Ruang Meeting:</span>
+                                    <span id="rev-room-name" class="font-extrabold text-slate-900 text-right">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Tanggal Rapat:</span>
+                                    <span id="rev-date" class="font-bold text-indigo-700 text-right">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Jam &amp; Durasi:</span>
+                                    <span id="rev-time" class="font-mono-code font-bold text-slate-900 text-right">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Jumlah Peserta:</span>
+                                    <span id="rev-participants" class="font-bold text-slate-900 text-right">-</span>
+                                </div>
+                            </div>
+
+                            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5 text-xs">
+                                <div class="flex items-center justify-between border-b border-slate-200/70 pb-2">
+                                    <span class="font-extrabold text-slate-700 uppercase tracking-wider">2. Pemesan &amp; Opsi Tambahan</span>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" onclick="goToBookingStep(3)" class="text-indigo-600 font-bold hover:underline cursor-pointer">Ubah Add-on</button>
+                                        <span class="text-slate-300">|</span>
+                                        <button type="button" onclick="goToBookingStep(4)" class="text-indigo-600 font-bold hover:underline cursor-pointer">Ubah Data Diri</button>
+                                    </div>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Nama Pemesan:</span>
+                                    <span id="rev-booker-name" class="font-extrabold text-slate-900 text-right">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Kontak Pemesan:</span>
+                                    <span id="rev-booker-contact" class="font-semibold text-slate-800 text-right">-</span>
+                                </div>
+                                <div class="pt-2 border-t border-slate-200/60 space-y-1.5">
+                                    <span class="text-slate-500 font-bold block">Rincian Opsi Tambahan Dipilih:</span>
+                                    <div id="rev-addons-list" class="space-y-1 text-slate-800 font-semibold">-</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. Rincian Tagihan Lengkap di Langkah 5 -->
+                        <div class="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/80 to-slate-50 border border-indigo-200/80 space-y-2.5 text-xs">
+                            <div class="flex items-center justify-between border-b border-indigo-200/60 pb-2">
+                                <span class="font-extrabold text-indigo-950 uppercase tracking-wider">3. Rincian Tagihan Pembayaran (Sewa Ruang + Opsi Tambahan)</span>
+                                <span class="font-mono-code text-[11px] font-bold text-indigo-700">Metode: QRIS</span>
+                            </div>
+                            <div id="rev-invoice-lines" class="space-y-1.5"></div>
+                            <div class="flex items-center justify-between pt-2 border-t border-indigo-200/80">
+                                <span class="text-xs font-extrabold uppercase tracking-wider text-indigo-950">Total Tagihan QRIS:</span>
+                                <span id="rev-total-price" class="text-lg font-extrabold font-mono-code text-indigo-700">Rp 0</span>
+                            </div>
+                        </div>
+
+                        <!-- Step 5 Footer Navigation & Final Submit -->
+                        <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
+                            <button type="button" onclick="goToBookingStep(4)"
+                                class="px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition cursor-pointer">
+                                &larr; Kembali ke Data Diri
+                            </button>
+
+                            <button type="submit" id="bf-submit-btn"
+                                class="px-7 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2 cursor-pointer">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                </svg>
+                                <span>Buat Pesanan &amp; Tampilkan QRIS Sekarang</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- RIGHT 4 COLS: STICKY LIVE RINGKASAN PESANAN -->
+                <div class="lg:col-span-4 lg:sticky lg:top-24 bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
                         <div>
-                            <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-600">Cek Ketersediaan Per Tanggal</span>
-                            <h2 class="text-lg font-extrabold text-slate-900">Slot Ketersediaan Ruang (08:00 – 21:00 WIB)</h2>
+                            <span class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600">Ringkasan Langsung</span>
+                            <h3 class="text-base font-extrabold text-slate-900">Detail Pilihan Anda</h3>
                         </div>
-                        <span id="avail-date-badge" class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-mono-code font-semibold"></span>
+                        <span id="wiz-side-step-badge" class="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-bold">Tahap 1/5</span>
                     </div>
 
-                    <!-- Continuous Free Ranges & Booked Summary -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200/70">
-                            <h3 class="text-xs font-bold uppercase tracking-wider text-emerald-800 mb-2 flex items-center gap-1.5">
-                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                <span>Rentang Waktu Kosong (Tersedia)</span>
-                            </h3>
-                            <div id="avail-free-ranges" class="space-y-1.5 text-xs text-emerald-950">
-                                <p class="text-slate-400">Pilih ruang dan tanggal...</p>
+                    <div class="space-y-2.5 text-xs">
+                        <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200/70 space-y-1.5">
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">Ruangan:</span>
+                                <span id="side-room-name" class="font-extrabold text-slate-900 text-right">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">Jumlah Peserta:</span>
+                                <span id="side-participants" class="font-bold text-slate-800 text-right">4 orang</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">Tanggal (WIB):</span>
+                                <span id="side-date" class="font-bold text-indigo-700 text-right">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">Durasi Rapat:</span>
+                                <span id="bf-duration-label" class="font-bold text-slate-800 text-right">2 Jam</span>
+                            </div>
+                            <div class="pt-2 border-t border-slate-200/70 space-y-1">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-slate-500 font-semibold">Opsi Tambahan Dipilih:</span>
+                                    <button type="button" onclick="goToBookingStep(3)" class="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer">Pilih/Ubah</button>
+                                </div>
+                                <div id="side-addons-summary" class="space-y-1 text-[11px] text-slate-700">
+                                    <span class="text-slate-400 italic">Belum ada opsi tambahan</span>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="p-4 rounded-2xl bg-rose-50/60 border border-rose-200/70">
-                            <h3 class="text-xs font-bold uppercase tracking-wider text-rose-800 mb-2 flex items-center gap-1.5">
-                                <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-                                <span>Slot Sudah Dipesan (Terisi)</span>
-                            </h3>
-                            <div id="avail-booked-ranges" class="space-y-1.5 text-xs text-rose-950">
-                                <p class="text-slate-400">Belum ada booking pada tanggal ini.</p>
+                        <!-- Server Price Estimation Box -->
+                        <div class="rounded-2xl bg-gradient-to-br from-indigo-50/90 to-slate-50 p-4 border border-indigo-100 space-y-2">
+                            <div class="flex items-center justify-between text-xs text-slate-600">
+                                <span id="side-room-price-label">Biaya Sewa Ruang:</span>
+                                <span id="bf-room-price-preview" class="font-bold text-slate-800 font-mono-code">Rp 0</span>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Interactive 30-Min Grid -->
-                    <div>
-                        <div class="flex items-center justify-between mb-2">
-                            <p class="text-xs font-bold text-slate-700 uppercase tracking-wider">Pilih Cepat Jam Mulai (Klik slot hijau di bawah)</p>
-                            <div class="flex items-center gap-3 text-xs">
-                                <span class="inline-flex items-center gap-1 text-emerald-700 font-medium"><span class="w-2.5 h-2.5 rounded-xs bg-emerald-500 inline-block"></span> Kosong</span>
-                                <span class="inline-flex items-center gap-1 text-rose-700 font-medium"><span class="w-2.5 h-2.5 rounded-xs bg-rose-500 inline-block"></span> Terisi</span>
+                            <div class="space-y-1">
+                                <div class="flex items-center justify-between text-xs text-slate-600">
+                                    <span>Biaya Opsi Tambahan:</span>
+                                    <span id="bf-addons-price-preview" class="font-bold text-indigo-700 font-mono-code">Rp 0</span>
+                                </div>
+                                <div id="side-addons-price-breakdown" class="space-y-1 pl-2 border-l-2 border-indigo-200/80 text-[11px] text-slate-600"></div>
                             </div>
-                        </div>
-                        <div id="avail-slots-grid" class="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-7 gap-2">
+                            <div class="flex items-center justify-between pt-2 border-t border-indigo-200/60">
+                                <span class="text-xs font-extrabold uppercase tracking-wider text-indigo-950">Estimasi Total:</span>
+                                <span id="bf-price-preview" class="text-lg font-extrabold text-indigo-700 font-mono-code">Rp 0</span>
+                            </div>
+                            <p id="bf-rule-hint" class="text-[11px] text-slate-500 leading-tight pt-1">
+                                * Total harga dihitung otomatis oleh sistem berdasarkan sewa ruang + fasilitas tambahan.
+                            </p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Room Cards Grid -->
-                <div class="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-4">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">Katalog Ruang Rapat</span>
-                            <h2 class="text-lg font-extrabold text-slate-900">Pilihan Ruang &amp; Filter Kapasitas</h2>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <label class="text-xs font-semibold text-slate-600">Min. Kapasitas:</label>
-                            <input type="number" id="filter-min-capacity" min="1" placeholder="Semua" oninput="loadRooms()"
-                                class="w-24 rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-medium focus:border-indigo-600 focus:outline-none">
-                        </div>
-                    </div>
-
-                    <div id="rooms-catalog-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    </div>
-                </div>
-            </div>
+            </form>
         </section>
 
         <!-- TAB 2: KALENDER PEMAKAIAN (FR-11) -->
@@ -389,16 +831,29 @@
                     <div>
                         <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">Jadwal Pemakaian Ruang</span>
                         <h2 class="text-xl font-extrabold text-slate-900">Kalender Pemakaian Ruang (Harian &amp; Mingguan)</h2>
+                        <p id="cal-active-date-label" class="text-xs font-semibold text-slate-500 mt-0.5"></p>
                     </div>
 
-                    <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex flex-wrap items-center gap-2.5">
                         <select id="cal-room-filter" onchange="loadCalendar()"
                             class="rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-800 focus:border-indigo-600 focus:outline-none">
                             <option value="">Semua Ruang</option>
                         </select>
 
-                        <input type="date" id="cal-date" onchange="loadCalendar()"
-                            class="rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-800 focus:border-indigo-600 focus:outline-none">
+                        <!-- Date Navigation Controls -->
+                        <div class="inline-flex items-center rounded-xl border border-slate-300 bg-slate-50 p-0.5">
+                            <button type="button" onclick="shiftCalendarDate(-1)" title="Hari Sebelumnya"
+                                class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-700 hover:bg-white transition cursor-pointer">&larr;</button>
+                            <input type="date" id="cal-date" onchange="loadCalendar()"
+                                class="bg-transparent px-2 py-1 text-xs font-bold text-slate-800 focus:outline-none">
+                            <button type="button" onclick="shiftCalendarDate(1)" title="Hari Berikutnya"
+                                class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-700 hover:bg-white transition cursor-pointer">&rarr;</button>
+                        </div>
+
+                        <button type="button" onclick="resetCalendarToToday()"
+                            class="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition cursor-pointer">
+                            Hari Ini
+                        </button>
 
                         <div class="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200">
                             <button type="button" onclick="setCalendarView('day')" id="cal-view-day"
@@ -419,12 +874,16 @@
             <div class="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-5">
                 <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
                     <div>
-                        <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">Kelola Pesanan Anda</span>
-                        <h2 class="text-xl font-extrabold text-slate-900">Riwayat Booking &amp; Pembatalan</h2>
-                        <p class="text-xs text-slate-500 mt-0.5">Pembatalan &lt; 2 jam sebelum jam mulai dikenai denda 50%. Pembatalan &ge; 2 jam sebelum mulai bebas denda (Rp 0).</p>
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">Kelola Pesanan Akun Anda ({{ session('customer_name') }})</span>
+                        <h2 class="text-xl font-extrabold text-slate-900">Pesanan Saya &amp; Pembatalan</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Hanya menampilkan pesanan milik akun Anda. Pembatalan &lt; 2 jam sebelum jam mulai dikenai denda 50%; &ge; 2 jam bebas denda (Rp 0).</p>
                     </div>
 
                     <div class="flex flex-wrap items-center gap-2.5">
+                        <span class="px-3 py-2 rounded-xl bg-indigo-50 border border-indigo-200 text-xs font-extrabold text-indigo-800">
+                            🔒 Akun: {{ session('customer_name') }}
+                        </span>
+
                         <select id="bl-payment-filter" onchange="loadBookingsList()"
                             class="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
                             <option value="">Semua Pembayaran</option>
@@ -446,6 +905,11 @@
 
                         <input type="text" id="bl-search" oninput="loadBookingsList()" placeholder="Cari nama pemesan..."
                             class="rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-800 focus:border-indigo-600 focus:outline-none">
+
+                        <button type="button" onclick="resetBookingsFilter()"
+                            class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer">
+                            Reset Filter
+                        </button>
                     </div>
                 </div>
 
@@ -472,94 +936,186 @@
 
     </main>
 
-    <!-- QRIS Payment Gateway & Invoice Modal -->
-    <div id="qris-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4 overflow-y-auto">
-        <div class="bg-white rounded-3xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden my-8">
-            <!-- Modal Header -->
-            <div class="bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-700 px-6 py-4 text-white flex items-center justify-between">
-                <div>
-                    <div class="flex items-center gap-2">
-                        <span class="px-2 py-0.5 rounded-md bg-white/20 text-[10px] font-extrabold uppercase tracking-wider">QRIS Payment Gateway</span>
-                        <span id="qm-status-badge" class="px-2 py-0.5 rounded-md bg-amber-400 text-slate-950 text-[10px] font-extrabold uppercase">MENUNGGU PEMBAYARAN</span>
-                    </div>
-                    <h3 class="text-base font-extrabold mt-1" id="qm-booking-code">RK-20261125-0001</h3>
+    <!-- QRIS Payment Gateway & Official Nota / Invoice Modal -->
+    <div id="qris-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-4 overflow-y-auto">
+        <div id="qris-modal-card" class="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden my-6">
+            <!-- Top Action Bar (Hidden on Print) -->
+            <div class="no-print bg-slate-900 px-6 py-3.5 text-white flex items-center justify-between border-b border-slate-800">
+                <div class="flex items-center gap-2.5">
+                    <span class="px-2.5 py-0.5 rounded-md bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-[10px] font-extrabold uppercase tracking-wider">Nota Resmi &amp; Bukti Reservasi</span>
+                    <span class="text-xs text-slate-400 hidden sm:inline">Siap dicetak atau disimpan sebagai PDF</span>
                 </div>
-                <button type="button" onclick="closeQrisModal()" class="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white font-bold cursor-pointer">✕</button>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="printOfficialInvoice()"
+                        class="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                        </svg>
+                        <span>Cetak Nota / PDF</span>
+                    </button>
+                    <button type="button" onclick="closeQrisModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white font-bold cursor-pointer">✕</button>
+                </div>
             </div>
 
-            <!-- Modal Body -->
-            <div class="p-6 space-y-4">
-                <!-- QRIS Card Frame -->
-                <div class="rounded-2xl border-2 border-slate-200 bg-slate-50/70 p-4 text-center space-y-3 relative overflow-hidden">
-                    <div class="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
-                        <div class="text-left">
-                            <span class="text-[10px] font-extrabold uppercase tracking-widest text-rose-600 block">QRIS · Standar Pembayaran Nasional</span>
-                            <p class="text-xs font-extrabold text-slate-900">RUANGKITA COWORKING SPACE</p>
-                            <p class="text-[10px] font-mono-code text-slate-500">NMID: ID1026000914300</p>
+            <!-- Printable Official Invoice / Nota Sheet -->
+            <div id="printable-invoice-sheet" class="p-6 sm:p-8 space-y-6 bg-white text-slate-900 relative">
+
+                <!-- 1. Kop / Header Nota Perusahaan -->
+                <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5">
+                    <div class="flex items-start gap-3.5">
+                        <div class="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-extrabold shadow-sm shrink-0">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
                         </div>
-                        <span class="px-2.5 py-1 rounded-lg bg-rose-600 text-white text-xs font-extrabold tracking-wider">QRIS</span>
+                        <div>
+                            <h2 class="text-lg font-extrabold tracking-tight text-slate-900 uppercase">RUANGKITA COWORKING SPACE</h2>
+                            <p class="text-xs font-medium text-slate-500">Gedung RuangKita Hub Lt. 3, Jl. Jenderal Sudirman, Jakarta</p>
+                            <p class="text-[11px] font-mono-code text-slate-500 mt-0.5">NPWP: 09.241.883.1-021.000 • NMID QRIS: ID1026000914300</p>
+                        </div>
                     </div>
 
-                    <!-- Dynamic Generated SVG QR Code -->
-                    <div id="qm-qr-container" class="mx-auto w-52 h-52 bg-white p-3 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-center">
-                    </div>
-
-                    <div>
-                        <p class="text-[11px] text-slate-500">Total Tagihan Pembayaran</p>
-                        <p id="qm-total-amount" class="text-2xl font-extrabold text-indigo-700 font-mono-code">Rp 0</p>
-                        <p id="qm-reference" class="text-[10px] font-mono-code text-slate-400 mt-0.5">Ref: -</p>
-                    </div>
-
-                    <!-- Paid Stamp Overlay -->
-                    <div id="qm-paid-banner" class="hidden rounded-xl bg-emerald-50 border border-emerald-200 p-2.5 text-emerald-800 text-xs font-bold">
-                        ✓ PEMBAYARAN QRIS LUNAS DIVERIFIKASI
+                    <div class="sm:text-right space-y-1">
+                        <div class="inline-flex items-center gap-2">
+                            <span class="text-[11px] font-extrabold uppercase tracking-widest text-slate-400">INVOICE / NOTA</span>
+                            <span id="qm-status-badge" class="px-2.5 py-0.5 rounded-md bg-amber-400 text-slate-950 text-[10px] font-extrabold uppercase">MENUNGGU PEMBAYARAN</span>
+                        </div>
+                        <p id="qm-invoice-number" class="text-sm font-mono-code font-extrabold text-indigo-700">INV/RK/20261124/0001</p>
+                        <p class="text-xs font-mono-code text-slate-600">Kode Booking: <strong id="qm-booking-code" class="text-slate-900">RK-20261125-0001</strong></p>
+                        <p id="qm-issued-at" class="text-[11px] text-slate-400">Tanggal Cetak: -</p>
                     </div>
                 </div>
 
-                <!-- Booking & Add-ons Invoice Breakdown -->
-                <div class="rounded-2xl bg-slate-50 border border-slate-200/80 p-3.5 text-xs space-y-2">
-                    <div class="flex justify-between">
-                        <span class="text-slate-500">Ruang &amp; Peserta:</span>
-                        <span id="qm-room-info" class="font-bold text-slate-900 text-right">-</span>
+                <!-- 2. Grid Informasi Penyewa & Detail Jadwal Ruangan -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-1.5 text-xs">
+                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Ditagihkan Kepada (Penyewa)</span>
+                        <p id="qm-booker-name" class="text-sm font-extrabold text-slate-900">-</p>
+                        <p id="qm-booker-contact" class="text-xs font-mono-code text-slate-600">-</p>
+                        <div class="pt-1.5 mt-1.5 border-t border-slate-200/70 flex items-center justify-between text-[11px]">
+                            <span class="text-slate-500">Status Reservasi:</span>
+                            <span id="qm-booking-status-text" class="font-extrabold text-emerald-700">CONFIRMED</span>
+                        </div>
                     </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-500">Jadwal Rapat (WIB):</span>
-                        <span id="qm-schedule-info" class="font-mono-code font-bold text-indigo-700 text-right">-</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-500">Pemesan:</span>
-                        <span id="qm-booker-info" class="font-semibold text-slate-800 text-right">-</span>
-                    </div>
-                    <div class="border-t border-slate-200/80 pt-2 space-y-1">
+
+                    <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-1.5 text-xs">
+                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Detail Ruang &amp; Jadwal Rapat</span>
                         <div class="flex justify-between">
-                            <span class="text-slate-600">Sewa Ruang:</span>
-                            <span id="qm-room-price" class="font-mono-code font-semibold text-slate-900">Rp 0</span>
+                            <span class="text-slate-500">Ruang Meeting:</span>
+                            <span id="qm-room-info" class="font-extrabold text-slate-900 text-right">-</span>
                         </div>
-                        <div id="qm-addons-breakdown" class="space-y-1"></div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-500">Tanggal Rapat:</span>
+                            <span id="qm-date-info" class="font-bold text-slate-900 text-right">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-500">Waktu (WIB):</span>
+                            <span id="qm-schedule-info" class="font-mono-code font-bold text-indigo-700 text-right">-</span>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Action Buttons -->
-                <div class="space-y-2 pt-1">
+                <!-- 3. Tabel Nota Rincian Layanan & Biaya -->
+                <div class="rounded-2xl border border-slate-200 overflow-hidden">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-900 text-white text-[10px] font-extrabold uppercase tracking-wider">
+                                <th class="py-2.5 px-3.5 w-10">No</th>
+                                <th class="py-2.5 px-3.5">Deskripsi Layanan / Fasilitas</th>
+                                <th class="py-2.5 px-3.5">Rincian Perhitungan</th>
+                                <th class="py-2.5 px-3.5 text-right">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="qm-invoice-items-tbody" class="divide-y divide-slate-200/80 bg-white">
+                        </tbody>
+                        <tfoot class="bg-slate-50 border-t-2 border-slate-300 text-xs">
+                            <tr>
+                                <td colspan="3" class="py-2 px-3.5 text-right font-semibold text-slate-500">Subtotal Sewa Ruang:</td>
+                                <td id="qm-room-price" class="py-2 px-3.5 text-right font-mono-code font-bold text-slate-800">Rp 0</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="py-2 px-3.5 text-right font-semibold text-slate-500">Subtotal Opsi Tambahan (Add-ons):</td>
+                                <td id="qm-addons-subtotal" class="py-2 px-3.5 text-right font-mono-code font-bold text-indigo-700">Rp 0</td>
+                            </tr>
+                            <tr id="qm-penalty-row" class="hidden bg-amber-50/80">
+                                <td colspan="3" class="py-2 px-3.5 text-right font-bold text-amber-800">Denda Pembatalan (&lt; 2 Jam Sebelum Mulai · 50%):</td>
+                                <td id="qm-penalty-amount" class="py-2 px-3.5 text-right font-mono-code font-extrabold text-amber-800">Rp 0</td>
+                            </tr>
+                            <tr class="border-t border-slate-300 bg-indigo-50/60">
+                                <td colspan="3" class="py-3 px-3.5 text-right font-extrabold uppercase tracking-wider text-indigo-950 text-sm">TOTAL TAGIHAN PEMBAYARAN:</td>
+                                <td id="qm-total-amount" class="py-3 px-3.5 text-right font-mono-code font-extrabold text-indigo-700 text-base">Rp 0</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- Hidden legacy container kept for compatibility -->
+                <div id="qm-addons-breakdown" class="hidden"></div>
+
+                <!-- 4. Bagian QRIS & Pengesahan / Stempel Lunas -->
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 p-4">
+                    <!-- QR Code Column (5 cols) -->
+                    <div class="sm:col-span-5 flex flex-col items-center text-center space-y-2">
+                        <div class="flex items-center gap-1.5">
+                            <span class="px-2 py-0.5 rounded bg-rose-600 text-white text-[10px] font-extrabold tracking-wider">QRIS</span>
+                            <span class="text-[10px] font-extrabold uppercase text-slate-600">Standar Pembayaran Nasional</span>
+                        </div>
+                        <div id="qm-qr-container" class="w-40 h-40 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-center"></div>
+                        <p id="qm-reference" class="text-[10px] font-mono-code text-slate-500">Ref: -</p>
+                    </div>
+
+                    <!-- Payment Verification & Terms Column (7 cols) -->
+                    <div class="sm:col-span-7 space-y-3 text-xs">
+                        <!-- Paid Stamp Overlay -->
+                        <div id="qm-paid-banner" class="hidden rounded-2xl bg-emerald-50 border-2 border-emerald-500/80 p-3.5 text-emerald-900 space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-extrabold uppercase tracking-wider text-emerald-800">✓ PEMBAYARAN QRIS LUNAS (PAID)</span>
+                                <span class="px-2 py-0.5 rounded bg-emerald-600 text-white font-mono-code text-[10px] font-bold">VERIFIED</span>
+                            </div>
+                            <p id="qm-paid-timestamp" class="text-[11px] font-mono-code text-emerald-700">Waktu Lunas: -</p>
+                            <p class="text-[11px] text-emerald-800">Nota ini merupakan bukti pembayaran yang sah untuk penggunaan ruang rapat RuangKita.</p>
+                        </div>
+
+                        <!-- Unpaid Instruction Banner -->
+                        <div id="qm-unpaid-banner" class="rounded-2xl bg-amber-50 border border-amber-200 p-3.5 text-amber-900 space-y-1">
+                            <p class="font-extrabold text-xs">Menunggu Pembayaran QRIS</p>
+                            <p class="text-[11px] leading-relaxed">Scan kode QRIS di samping menggunakan aplikasi m-Banking atau e-Wallet (GoPay, OVO, DANA, ShopeePay, LinkAja), atau klik tombol simulasi bayar di bawah.</p>
+                        </div>
+
+                        <!-- Ketentuan & Tanda Terima Resmi -->
+                        <div class="p-3 rounded-xl bg-white border border-slate-200/80 text-[11px] text-slate-500 space-y-1 leading-relaxed">
+                            <p class="font-bold text-slate-700">Ketentuan Reservasi &amp; Pembatalan (BR-04 &amp; BR-05):</p>
+                            <p>• Harap hadir 10 menit sebelum jadwal mulai dan tunjukkan kode booking ini kepada resepsionis.</p>
+                            <p>• Pembatalan &ge; 2 jam sebelum jadwal mulai bebas denda (Rp 0). Pembatalan &lt; 2 jam dikenakan denda 50%.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. Action Buttons (Hidden on Print) -->
+                <div class="no-print space-y-2.5 pt-2 border-t border-slate-100">
                     <button type="button" id="qm-pay-btn" onclick="confirmQrisPaymentFromModal()"
-                        class="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2 cursor-pointer">
+                        class="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2 cursor-pointer">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                         <span>Simulasikan Scan &amp; Bayar QRIS Sekarang</span>
                     </button>
 
-                    <div class="flex items-center gap-2">
-                        <button type="button" onclick="window.print()"
-                            class="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer">
-                            Cetak Bukti / Invoice
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <button type="button" onclick="printOfficialInvoice()"
+                            class="flex-1 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition flex items-center justify-center gap-2 cursor-pointer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                            </svg>
+                            <span>Cetak Nota / Simpan PDF</span>
                         </button>
                         <button type="button" onclick="closeQrisModal()"
-                            class="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer">
-                            Tutup
+                            class="py-3 px-5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer">
+                            Tutup Jendela
                         </button>
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
@@ -582,11 +1138,433 @@
     <script>
         let state = {
             rooms: [],
+            selectedCategory: 'ALL',
+            bookingStep: 1,
+            loggedInCustomer: {
+                id: @json(session('customer_id')),
+                name: @json(session('customer_name', '')),
+                email: @json(session('customer_email', '')),
+                phone: @json(session('customer_phone', '')),
+            },
             additionalFacilities: [],
             selectedAddons: {}, // { [facilityId]: quantity }
             bookings: [],
             calendarView: 'day',
+            lastAvailabilityData: null,
         };
+
+        function validateStepBeforeAdvance(step) {
+            const roomId = document.getElementById('bf-room')?.value;
+            const room = state.rooms.find(r => String(r.id) === String(roomId));
+            const participants = Number(document.getElementById('bf-participants')?.value || 0);
+            const date = document.getElementById('bf-date')?.value;
+            const start = document.getElementById('bf-start')?.value;
+            const end = document.getElementById('bf-end')?.value;
+
+            if (step === 1) {
+                if (!room) {
+                    showAlert('warning', 'Pilih Ruangan Terlebih Dahulu', 'Silakan pilih salah satu ruang meeting sebelum melanjutkan ke Langkah 2.');
+                    return false;
+                }
+                if (!room.is_active) {
+                    showAlert('error', 'Ruangan Tidak Aktif (BR-07)', `${room.name} sedang tidak aktif dan tidak dapat dipesan.`);
+                    return false;
+                }
+                if (participants <= 0 || participants > room.capacity) {
+                    showAlert('error', 'Kapasitas Ruangan Terlampaui (BR-02)', `Jumlah peserta (${participants} orang) melebihi kapasitas maksimal ${room.name} (${room.capacity} orang).`);
+                    return false;
+                }
+            }
+
+            if (step === 2) {
+                if (!date || !start || !end) {
+                    showAlert('warning', 'Lengkapi Tanggal & Jam Rapat', 'Silakan pilih tanggal, jam mulai, dan jam selesai.');
+                    return false;
+                }
+                const startMins = timeToMinutes(start);
+                const endMins = timeToMinutes(end);
+                const diffMins = endMins - startMins;
+
+                if (diffMins <= 0) {
+                    showAlert('error', 'Urutan Waktu Tidak Valid (BR-06)', 'Jam selesai harus setelah jam mulai.');
+                    return false;
+                }
+                if (startMins < 8 * 60 || endMins > 21 * 60) {
+                    showAlert('error', 'Di Luar Jam Operasional (BR-04)', 'Jam pemesanan harus berada dalam jam operasional 08:00 – 21:00 WIB.');
+                    return false;
+                }
+                if (diffMins < 60 || diffMins > 480) {
+                    showAlert('error', 'Durasi Tidak Memenuhi Aturan (BR-03)', 'Durasi setiap pemesanan minimal 1 jam (60 menit) dan maksimal 8 jam (480 menit).');
+                    return false;
+                }
+
+                // Check overlap against loaded booked_slots on client side for immediate feedback
+                if (state.lastAvailabilityData && Array.isArray(state.lastAvailabilityData.booked_slots)) {
+                    const conflict = state.lastAvailabilityData.booked_slots.find(b => {
+                        const bStart = timeToMinutes(b.start_time);
+                        const bEnd = timeToMinutes(b.end_time);
+                        return startMins < bEnd && endMins > bStart;
+                    });
+                    if (conflict) {
+                        showAlert(
+                            'error',
+                            'Jadwal Bentrok / Overlap (BR-01)',
+                            `Rentang ${start}–${end} WIB beririsan dengan jadwal yang sudah terisi (${conflict.start_time}–${conflict.end_time} WIB atas nama ${conflict.booker_name}). Silakan pilih slot hijau yang kosong.`
+                        );
+                        return false;
+                    }
+                }
+            }
+
+            if (step === 4) {
+                const name = (document.getElementById('bf-name')?.value || '').trim();
+                const contact = (document.getElementById('bf-contact')?.value || '').trim();
+                if (!name) {
+                    showAlert('warning', 'Nama Pemesan Wajib Diisi', 'Silakan isi nama lengkap pemesan atau nama tim Anda.');
+                    document.getElementById('bf-name')?.focus();
+                    return false;
+                }
+                if (!contact) {
+                    showAlert('warning', 'Kontak Pemesan Wajib Diisi', 'Silakan isi nomor WhatsApp atau alamat email aktif.');
+                    document.getElementById('bf-contact')?.focus();
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        function goToBookingStep(targetStep) {
+            const target = Math.max(1, Math.min(5, Number(targetStep || 1)));
+
+            // Validate every intermediate step when moving forward
+            if (target > state.bookingStep) {
+                for (let s = state.bookingStep; s < target; s++) {
+                    if (!validateStepBeforeAdvance(s)) {
+                        return;
+                    }
+                }
+            }
+
+            state.bookingStep = target;
+
+            for (let i = 1; i <= 5; i++) {
+                const panel = document.getElementById(`wizard-panel-${i}`);
+                const navBtn = document.getElementById(`wiz-nav-${i}`);
+                const circle = document.getElementById(`wiz-circle-${i}`);
+
+                if (panel) {
+                    panel.classList.toggle('hidden', i !== target);
+                }
+
+                if (navBtn && circle) {
+                    const labelSpans = navBtn.querySelectorAll('span');
+                    const stepSmallLabel = labelSpans[1];
+                    const stepTitleLabel = labelSpans[2];
+
+                    if (i === target) {
+                        navBtn.className = `${i === 5 ? 'col-span-2 sm:col-span-1 ' : ''}flex items-center gap-2.5 p-2.5 rounded-2xl border-2 border-indigo-600 bg-indigo-50/80 text-left shadow-2xs transition cursor-pointer`;
+                        circle.className = 'w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-extrabold flex items-center justify-center shrink-0';
+                        circle.textContent = String(i);
+                        if (stepSmallLabel) stepSmallLabel.className = 'block text-[10px] font-bold uppercase tracking-wider text-indigo-600';
+                        if (stepTitleLabel) stepTitleLabel.className = 'block text-xs font-extrabold text-slate-900 truncate';
+                    } else if (i < target) {
+                        navBtn.className = `${i === 5 ? 'col-span-2 sm:col-span-1 ' : ''}flex items-center gap-2.5 p-2.5 rounded-2xl border border-emerald-300 bg-emerald-50/50 hover:bg-emerald-50 text-left transition cursor-pointer`;
+                        circle.className = 'w-7 h-7 rounded-full bg-emerald-600 text-white text-xs font-extrabold flex items-center justify-center shrink-0';
+                        circle.textContent = '✓';
+                        if (stepSmallLabel) stepSmallLabel.className = 'block text-[10px] font-bold uppercase tracking-wider text-emerald-700';
+                        if (stepTitleLabel) stepTitleLabel.className = 'block text-xs font-extrabold text-emerald-950 truncate';
+                    } else {
+                        navBtn.className = `${i === 5 ? 'col-span-2 sm:col-span-1 ' : ''}flex items-center gap-2.5 p-2.5 rounded-2xl border border-slate-200 bg-slate-50/60 hover:bg-slate-100 text-left transition cursor-pointer`;
+                        circle.className = 'w-7 h-7 rounded-full bg-slate-200 text-slate-700 text-xs font-extrabold flex items-center justify-center shrink-0';
+                        circle.textContent = String(i);
+                        if (stepSmallLabel) stepSmallLabel.className = 'block text-[10px] font-bold uppercase tracking-wider text-slate-400';
+                        if (stepTitleLabel) stepTitleLabel.className = 'block text-xs font-extrabold text-slate-700 truncate';
+                    }
+                }
+            }
+
+            const sideBadge = document.getElementById('wiz-side-step-badge');
+            if (sideBadge) {
+                sideBadge.textContent = `Tahap ${target}/5`;
+            }
+
+            updateWizardReviewSummary();
+            window.scrollTo({ top: 160, behavior: 'smooth' });
+        }
+
+        function getSelectedAddonsDetailedList(durationMinutes, participants) {
+            const hours = Math.max(0, durationMinutes / 60);
+            const items = [];
+
+            Object.entries(state.selectedAddons).forEach(([idStr, qty]) => {
+                const addon = state.additionalFacilities.find(a => String(a.id) === String(idStr));
+                if (!addon) return;
+                const q = Math.max(1, Number(qty || 1));
+                let subtotal = 0;
+                let formulaText = '';
+
+                if (addon.pricing_type === 'PER_HOUR') {
+                    subtotal = Math.round(addon.price * hours * q);
+                    formulaText = `${q} unit × ${hours} jam × ${formatRupiah(addon.price)}/jam`;
+                } else if (addon.pricing_type === 'PER_PARTICIPANT') {
+                    subtotal = Math.round(addon.price * Math.max(0, participants) * q);
+                    formulaText = `${participants} peserta × ${formatRupiah(addon.price)}/peserta`;
+                } else {
+                    subtotal = Math.round(addon.price * q);
+                    formulaText = `${q} paket × ${formatRupiah(addon.price)}/booking`;
+                }
+
+                items.push({
+                    id: addon.id,
+                    name: addon.name,
+                    quantity: q,
+                    pricing_type: addon.pricing_type,
+                    unit_price: addon.price,
+                    formula: formulaText,
+                    subtotal,
+                });
+            });
+
+            return items;
+        }
+
+        function updateWizardReviewSummary() {
+            const roomId = document.getElementById('bf-room')?.value;
+            const room = state.rooms.find(r => String(r.id) === String(roomId));
+            const date = document.getElementById('bf-date')?.value || getTodayWibString();
+            const start = document.getElementById('bf-start')?.value || '09:00';
+            const end = document.getElementById('bf-end')?.value || '11:00';
+            const participants = Number(document.getElementById('bf-participants')?.value || 0);
+            const bookerName = (document.getElementById('bf-name')?.value || '').trim();
+            const bookerContact = (document.getElementById('bf-contact')?.value || '').trim();
+            const diffMins = Math.max(0, timeToMinutes(end) - timeToMinutes(start));
+            const hours = diffMins / 60;
+
+            const roomTotal = room && diffMins > 0 ? Math.max(0, Math.round(hours * room.price_per_hour)) : 0;
+            const addonItems = getSelectedAddonsDetailedList(diffMins, participants);
+            const addonsTotal = addonItems.reduce((sum, item) => sum + item.subtotal, 0);
+            const grandTotal = roomTotal + addonsTotal;
+
+            // Update sticky sidebar
+            const sideRoom = document.getElementById('side-room-name');
+            const sidePart = document.getElementById('side-participants');
+            const sideDate = document.getElementById('side-date');
+            const sideRoomPriceLabel = document.getElementById('side-room-price-label');
+            const sideAddonsSummary = document.getElementById('side-addons-summary');
+            const sideAddonsBreakdown = document.getElementById('side-addons-price-breakdown');
+
+            if (sideRoom) sideRoom.textContent = room ? `${room.name} (Maks ${room.capacity})` : '-';
+            if (sidePart) sidePart.textContent = `${participants} orang`;
+            if (sideDate) sideDate.textContent = formatFriendlyDateWib(date);
+            if (sideRoomPriceLabel) {
+                sideRoomPriceLabel.textContent = room && hours > 0
+                    ? `Sewa Ruang (${hours} jam × ${formatRupiah(room.price_per_hour)}):`
+                    : 'Biaya Sewa Ruang:';
+            }
+
+            if (sideAddonsSummary) {
+                if (!addonItems.length) {
+                    sideAddonsSummary.innerHTML = '<span class="text-slate-400 italic">Tidak ada opsi tambahan dipilih</span>';
+                } else {
+                    sideAddonsSummary.innerHTML = addonItems.map(item => `
+                        <div class="flex items-start justify-between gap-2 bg-white px-2.5 py-1.5 rounded-xl border border-indigo-100">
+                            <div class="min-w-0">
+                                <span class="font-bold text-indigo-950 block truncate">+ ${item.name}</span>
+                                <span class="text-[10px] text-slate-500 block">${item.formula}</span>
+                            </div>
+                            <span class="font-mono-code font-bold text-indigo-700 shrink-0">${formatRupiah(item.subtotal)}</span>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            if (sideAddonsBreakdown) {
+                if (!addonItems.length) {
+                    sideAddonsBreakdown.innerHTML = '';
+                } else {
+                    sideAddonsBreakdown.innerHTML = addonItems.map(item => `
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="truncate">• ${item.name} (${item.pricing_type === 'PER_PARTICIPANT' ? participants + ' org' : 'x' + item.quantity})</span>
+                            <span class="font-mono-code font-semibold text-indigo-700 shrink-0">${formatRupiah(item.subtotal)}</span>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            // Update Step 5 Review Card
+            const revRoom = document.getElementById('rev-room-name');
+            const revDate = document.getElementById('rev-date');
+            const revTime = document.getElementById('rev-time');
+            const revPart = document.getElementById('rev-participants');
+            const revName = document.getElementById('rev-booker-name');
+            const revContact = document.getElementById('rev-booker-contact');
+            const revAddons = document.getElementById('rev-addons-list');
+            const revInvoiceLines = document.getElementById('rev-invoice-lines');
+            const revTotalPrice = document.getElementById('rev-total-price');
+
+            if (revRoom) revRoom.textContent = room ? `${room.name} (${getRoomCategoryInfo(room).label})` : '-';
+            if (revDate) revDate.textContent = formatFriendlyDateWib(date);
+            if (revTime) revTime.textContent = `${start} – ${end} WIB (${hours} Jam)`;
+            if (revPart) revPart.textContent = `${participants} Peserta`;
+            if (revName) revName.textContent = bookerName || '(Belum diisi)';
+            if (revContact) revContact.textContent = bookerContact || '(Belum diisi)';
+
+            if (revAddons) {
+                if (!addonItems.length) {
+                    revAddons.innerHTML = '<span class="text-slate-400 font-normal italic">Tidak ada opsi tambahan dipilih</span>';
+                } else {
+                    revAddons.innerHTML = addonItems.map(item => `
+                        <div class="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-white border border-indigo-200/80">
+                            <div>
+                                <span class="font-bold text-indigo-900 block">+ ${item.name}</span>
+                                <span class="text-[10px] font-normal text-slate-500">${item.formula}</span>
+                            </div>
+                            <span class="font-mono-code font-bold text-indigo-700">${formatRupiah(item.subtotal)}</span>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            if (revInvoiceLines) {
+                const roomLineHtml = room ? `
+                    <div class="flex items-center justify-between py-1">
+                        <div>
+                            <span class="font-bold text-slate-900">Sewa ${room.name}</span>
+                            <span class="text-[11px] text-slate-500 block">${hours} jam × ${formatRupiah(room.price_per_hour)} / jam</span>
+                        </div>
+                        <span class="font-mono-code font-bold text-slate-900">${formatRupiah(roomTotal)}</span>
+                    </div>
+                ` : '';
+
+                const addonLinesHtml = addonItems.map(item => `
+                    <div class="flex items-center justify-between py-1 border-t border-indigo-100/80">
+                        <div>
+                            <span class="font-bold text-indigo-900">+ ${item.name}</span>
+                            <span class="text-[11px] text-slate-500 block">${item.formula}</span>
+                        </div>
+                        <span class="font-mono-code font-bold text-indigo-700">${formatRupiah(item.subtotal)}</span>
+                    </div>
+                `).join('');
+
+                revInvoiceLines.innerHTML = roomLineHtml + (addonLinesHtml || `
+                    <div class="flex items-center justify-between py-1 border-t border-indigo-100/80 text-slate-400">
+                        <span>Opsi Tambahan (Add-ons)</span>
+                        <span class="font-mono-code">Rp 0</span>
+                    </div>
+                `);
+            }
+
+            if (revTotalPrice) {
+                revTotalPrice.textContent = formatRupiah(grandTotal);
+            }
+        }
+
+        function getRoomCategoryInfo(room) {
+            const cap = Number(room.capacity || 0);
+            const layout = String(room.layout_type || '').toUpperCase();
+            if (cap <= 6 || layout === 'POD') {
+                return {
+                    code: 'SMALL',
+                    label: 'Small / Huddle Pod',
+                    badgeClass: 'bg-sky-50 text-sky-700 border-sky-200',
+                    desc: 'Ideal untuk diskusi tim kecil & 1-on-1',
+                };
+            }
+            if (cap <= 12) {
+                return {
+                    code: 'MEDIUM',
+                    label: 'Medium / Boardroom',
+                    badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+                    desc: 'Ideal untuk rapat divisi & presentasi eksekutif',
+                };
+            }
+            return {
+                code: 'LARGE',
+                label: 'Large / Conference Hall',
+                badgeClass: 'bg-violet-50 text-violet-700 border-violet-200',
+                desc: 'Ideal untuk workshop, seminar & townhall',
+            };
+        }
+
+        function roomMatchesCategory(room, category) {
+            if (!category || category === 'ALL') return true;
+            return getRoomCategoryInfo(room).code === category;
+        }
+
+        function updateCategoryBadgesCount() {
+            const counts = {
+                ALL: state.rooms.length,
+                SMALL: state.rooms.filter(r => getRoomCategoryInfo(r).code === 'SMALL').length,
+                MEDIUM: state.rooms.filter(r => getRoomCategoryInfo(r).code === 'MEDIUM').length,
+                LARGE: state.rooms.filter(r => getRoomCategoryInfo(r).code === 'LARGE').length,
+            };
+
+            ['ALL', 'SMALL', 'MEDIUM', 'LARGE'].forEach(cat => {
+                const el = document.getElementById(`cat-count-${cat}`);
+                if (el) {
+                    el.textContent = String(counts[cat] || 0);
+                    if (cat === state.selectedCategory) {
+                        el.className = 'px-1.5 py-0.5 rounded-md bg-white/20 text-white text-[10px] font-extrabold';
+                    } else {
+                        el.className = 'px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-extrabold';
+                    }
+                }
+            });
+        }
+
+        function selectRoomCategory(category) {
+            state.selectedCategory = category || 'ALL';
+            document.querySelectorAll('.cat-pill-btn').forEach(btn => {
+                const cat = btn.getAttribute('data-cat-pill');
+                const spans = btn.querySelectorAll('span');
+                const subSpan = spans[spans.length - 1];
+                if (cat === state.selectedCategory) {
+                    btn.className = 'cat-pill-btn p-3 rounded-2xl text-left border border-indigo-600 bg-indigo-600 text-white shadow-xs transition cursor-pointer';
+                    if (subSpan) subSpan.className = 'block text-[11px] opacity-85 mt-0.5';
+                } else {
+                    btn.className = 'cat-pill-btn p-3 rounded-2xl text-left border border-slate-200 bg-white text-slate-700 hover:border-indigo-400 transition cursor-pointer';
+                    if (subSpan) subSpan.className = 'block text-[11px] text-slate-500 mt-0.5';
+                }
+            });
+
+            updateCategoryBadgesCount();
+            populateBookingRoomOptions(true);
+            renderRoomsCatalog();
+            updatePricePreview();
+            loadRoomAvailability();
+        }
+
+        function populateBookingRoomOptions(autoSelectFirstInCat = false) {
+            const bfRoom = document.getElementById('bf-room');
+            if (!bfRoom) return;
+            const currentRoomId = bfRoom.value;
+            bfRoom.innerHTML = '';
+
+            const filteredRooms = state.rooms.filter(r => roomMatchesCategory(r, state.selectedCategory));
+            const roomsToShow = filteredRooms.length ? filteredRooms : state.rooms;
+
+            roomsToShow.forEach(room => {
+                const catInfo = getRoomCategoryInfo(room);
+                const opt = document.createElement('option');
+                opt.value = room.id;
+                opt.textContent = `[${catInfo.label}] ${room.name} (Maks ${room.capacity} org · ${formatRupiah(room.price_per_hour)}/jam)${room.is_active ? '' : ' [Tidak Tersedia]'}`;
+                bfRoom.appendChild(opt);
+            });
+
+            if (!autoSelectFirstInCat && currentRoomId && roomsToShow.some(r => String(r.id) === String(currentRoomId))) {
+                bfRoom.value = currentRoomId;
+            } else {
+                const firstActive = roomsToShow.find(r => r.is_active) || roomsToShow[0];
+                if (firstActive) {
+                    bfRoom.value = firstActive.id;
+                    const partInput = document.getElementById('bf-participants');
+                    if (partInput && Number(partInput.value) > firstActive.capacity) {
+                        partInput.value = firstActive.capacity;
+                    }
+                }
+            }
+        }
 
         function formatPricingTypeLabel(type) {
             if (type === 'PER_HOUR') return '/ jam';
@@ -602,6 +1580,38 @@
                 month: '2-digit',
                 day: '2-digit'
             }).format(now);
+        }
+
+        function addDaysToDateString(baseDateStr, offsetDays) {
+            const [y, m, d] = (baseDateStr || getTodayWibString()).split('-').map(Number);
+            const dt = new Date(Date.UTC(y, m - 1, d + offsetDays));
+            const yy = dt.getUTCFullYear();
+            const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+            const dd = String(dt.getUTCDate()).padStart(2, '0');
+            return `${yy}-${mm}-${dd}`;
+        }
+
+        function formatFriendlyDateWib(dateStr) {
+            if (!dateStr) return '-';
+            const [y, m, d] = dateStr.split('-').map(Number);
+            if (!y || !m || !d) return dateStr;
+            const dt = new Date(Date.UTC(y, m - 1, d, 5, 0, 0));
+            const formatted = new Intl.DateTimeFormat('id-ID', {
+                timeZone: 'Asia/Jakarta',
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            }).format(dt);
+
+            const today = getTodayWibString();
+            const tomorrow = addDaysToDateString(today, 1);
+            const dayAfter = addDaysToDateString(today, 2);
+
+            if (dateStr === today) return `Hari Ini • ${formatted}`;
+            if (dateStr === tomorrow) return `Besok • ${formatted}`;
+            if (dateStr === dayAfter) return `Lusa • ${formatted}`;
+            return formatted;
         }
 
         function formatRupiah(amount) {
@@ -622,6 +1632,32 @@
                 hour12: false
             }).format(now);
             document.getElementById('wib-clock').textContent = formatted + ' WIB';
+        }
+
+        function showToast(type, title, message) {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const toastStyles = {
+                success: 'bg-emerald-950/95 border-emerald-500/60 text-emerald-50',
+                error: 'bg-rose-950/95 border-rose-500/60 text-rose-50',
+                warning: 'bg-amber-950/95 border-amber-500/60 text-amber-50',
+                info: 'bg-slate-900/95 border-indigo-500/60 text-slate-50',
+            };
+
+            const toast = document.createElement('div');
+            toast.className = `pointer-events-auto rounded-2xl p-4 border shadow-xl backdrop-blur-md flex items-start justify-between gap-3 transition-all duration-300 ${toastStyles[type] || toastStyles.info}`;
+            toast.innerHTML = `
+                <div class="space-y-0.5">
+                    <p class="font-extrabold text-xs">${title}</p>
+                    <p class="text-[11px] opacity-90 leading-relaxed">${message}</p>
+                </div>
+                <button onclick="this.parentElement.remove()" class="text-xs font-bold opacity-70 hover:opacity-100 cursor-pointer">✕</button>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => {
+                if (toast.parentElement) toast.remove();
+            }, 5500);
         }
 
         function showAlert(type, title, message, httpStatus = null) {
@@ -651,6 +1687,7 @@
                 <button onclick="document.getElementById('alert-box').classList.add('hidden')" class="text-xs font-bold opacity-70 hover:opacity-100 cursor-pointer">✕</button>
             `;
             box.classList.remove('hidden');
+            showToast(type, title, message);
         }
 
         function switchTab(tabName) {
@@ -736,10 +1773,6 @@
             const activeRooms = state.rooms.filter(r => r.is_active);
             document.getElementById('stat-active-rooms').textContent = `${activeRooms.length} Ruang`;
 
-            const bfRoom = document.getElementById('bf-room');
-            const currentRoomId = bfRoom.value;
-            bfRoom.innerHTML = '';
-
             const calRoom = document.getElementById('cal-room-filter');
             const currentCalRoom = calRoom.value;
             calRoom.innerHTML = '<option value="">Semua Ruang</option>';
@@ -749,11 +1782,6 @@
             blRoom.innerHTML = '<option value="">Semua Ruang</option>';
 
             state.rooms.forEach(room => {
-                const opt = document.createElement('option');
-                opt.value = room.id;
-                opt.textContent = `${room.name} (Kapasitas ${room.capacity} org · ${formatRupiah(room.price_per_hour)}/jam)${room.is_active ? '' : ' [Tidak Tersedia]'}`;
-                bfRoom.appendChild(opt);
-
                 const optCal = document.createElement('option');
                 optCal.value = room.id;
                 optCal.textContent = room.name;
@@ -765,8 +1793,42 @@
                 blRoom.appendChild(optBl);
             });
 
-            if (currentRoomId && state.rooms.some(r => String(r.id) === String(currentRoomId))) {
-                bfRoom.value = currentRoomId;
+            populateBookingRoomOptions(false);
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlRoomId = urlParams.get('room_id');
+            if (!state.initialQueryApplied && urlRoomId && state.rooms.some(r => String(r.id) === String(urlRoomId))) {
+                state.initialQueryApplied = true;
+                const matchedRoom = state.rooms.find(r => String(r.id) === String(urlRoomId));
+                document.getElementById('bf-room').value = urlRoomId;
+
+                const urlDate = urlParams.get('date');
+                if (urlDate && /^\d{4}-\d{2}-\d{2}$/.test(urlDate)) {
+                    document.getElementById('bf-date').value = urlDate;
+                    syncQuickDateButtons();
+                }
+
+                const urlStart = urlParams.get('start_time');
+                const urlEnd = urlParams.get('end_time');
+                if (urlStart && document.querySelector(`#bf-start option[value="${urlStart}"]`)) {
+                    document.getElementById('bf-start').value = urlStart;
+                }
+                if (urlEnd && document.querySelector(`#bf-end option[value="${urlEnd}"]`)) {
+                    document.getElementById('bf-end').value = urlEnd;
+                }
+
+                const urlPart = Number(urlParams.get('participants') || 0);
+                if (urlPart > 0 && matchedRoom) {
+                    document.getElementById('bf-participants').value = Math.min(urlPart, matchedRoom.capacity);
+                } else if (matchedRoom && Number(document.getElementById('bf-participants').value) > matchedRoom.capacity) {
+                    document.getElementById('bf-participants').value = matchedRoom.capacity;
+                }
+
+                // Karena ruangan sudah dipilih dari Landing Page, langsung arahkan ke Langkah 2 (Tanggal & Jam)
+                setTimeout(() => {
+                    if (matchedRoom && matchedRoom.is_active) {
+                        goToBookingStep(2);
+                    }
+                }, 50);
             }
             calRoom.value = currentCalRoom;
             blRoom.value = currentBlRoom;
@@ -830,6 +1892,154 @@
             }).join('');
         }
 
+        function setQuickCapacityFilter(val) {
+            const input = document.getElementById('filter-min-capacity');
+            if (input) input.value = val;
+            document.querySelectorAll('.cap-filter-btn').forEach(btn => {
+                if (btn.getAttribute('data-cap') === String(val)) {
+                    btn.className = 'cap-filter-btn px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-600 text-white cursor-pointer';
+                } else {
+                    btn.className = 'cap-filter-btn px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer';
+                }
+            });
+            loadRooms();
+        }
+
+        function onParticipantsInputChange() {
+            const participants = Math.max(1, Number(document.getElementById('bf-participants')?.value || 1));
+            const bfRoom = document.getElementById('bf-room');
+            const currentRoom = state.rooms.find(r => String(r.id) === String(bfRoom?.value));
+
+            // Jika ruang yang sedang terpilih tidak muat untuk jumlah peserta baru,
+            // otomatis pilihkan ruang aktif di katalog yang kapasitasnya mencukupi
+            if (currentRoom && currentRoom.capacity < participants) {
+                const candidateRooms = state.rooms
+                    .filter(r => r.is_active && r.capacity >= participants)
+                    .sort((a, b) => a.capacity - b.capacity);
+
+                if (candidateRooms.length > 0) {
+                    const bestFitRoom = candidateRooms[0];
+                    if ( state.selectedCategory !== 'ALL' && !roomMatchesCategory(bestFitRoom, state.selectedCategory)) {
+                        state.selectedCategory = 'ALL';
+                        selectRoomCategory('ALL');
+                    }
+                    bfRoom.value = bestFitRoom.id;
+                    loadRoomAvailability();
+                }
+            }
+
+            updatePricePreview();
+            renderRoomsCatalog();
+        }
+
+        function setParticipantsCount(count) {
+            const el = document.getElementById('bf-participants');
+            if (!el) return;
+            el.value = Math.max(1, Number(count || 1));
+            onParticipantsInputChange();
+        }
+
+        function adjustParticipants(delta) {
+            const el = document.getElementById('bf-participants');
+            if (!el) return;
+            const current = Number(el.value || 1);
+            el.value = Math.max(1, current + delta);
+            onParticipantsInputChange();
+        }
+
+        function setParticipantsToRoomMax() {
+            // Cari kapasitas tertinggi dari katalog ruang aktif (sesuai kategori aktif atau seluruh katalog)
+            const pool = state.rooms.filter(r => r.is_active && roomMatchesCategory(r, state.selectedCategory));
+            const activeRooms = pool.length ? pool : state.rooms.filter(r => r.is_active);
+            if (!activeRooms.length) return;
+
+            const maxRoom = [...activeRooms].sort((a, b) => b.capacity - a.capacity)[0];
+            const bfRoom = document.getElementById('bf-room');
+            if (bfRoom && maxRoom) {
+                bfRoom.value = maxRoom.id;
+                setParticipantsCount(maxRoom.capacity);
+                loadRoomAvailability();
+            }
+        }
+
+        function setBookingQuickDate(offsetDays) {
+            const targetDate = addDaysToDateString(getTodayWibString(), offsetDays);
+            const dateInput = document.getElementById('bf-date');
+            if (dateInput) {
+                dateInput.value = targetDate;
+                onBookingRoomOrDateChange();
+            }
+        }
+
+        function syncQuickDateButtons() {
+            const selectedDate = document.getElementById('bf-date')?.value || getTodayWibString();
+            const today = getTodayWibString();
+            const labelEl = document.getElementById('bf-date-human-label');
+            if (labelEl) {
+                labelEl.textContent = formatFriendlyDateWib(selectedDate);
+            }
+
+            [0, 1, 2].forEach(offset => {
+                const btn = document.getElementById(`bf-qdate-${offset}`);
+                if (!btn) return;
+                const d = addDaysToDateString(today, offset);
+                if (selectedDate === d) {
+                    btn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-600 text-white transition cursor-pointer';
+                } else {
+                    btn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 transition cursor-pointer';
+                }
+            });
+        }
+
+        function setBookingDurationHours(hours) {
+            const startSelect = document.getElementById('bf-start');
+            const endSelect = document.getElementById('bf-end');
+            if (!startSelect || !endSelect) return;
+
+            let startMins = timeToMinutes(startSelect.value);
+            const durationMins = Math.round(Number(hours) * 60);
+            let targetEndMins = startMins + durationMins;
+
+            // If end exceeds 21:00 WIB, shift start time earlier so full duration fits
+            if (targetEndMins > 21 * 60) {
+                targetEndMins = 21 * 60;
+                startMins = Math.max(8 * 60, targetEndMins - durationMins);
+                const sh = String(Math.floor(startMins / 60)).padStart(2, '0');
+                const sm = String(startMins % 60).padStart(2, '0');
+                startSelect.value = `${sh}:${sm}`;
+            }
+
+            const eh = String(Math.floor(targetEndMins / 60)).padStart(2, '0');
+            const em = String(targetEndMins % 60).padStart(2, '0');
+            endSelect.value = `${eh}:${em}`;
+
+            onTimeSelectionChange();
+        }
+
+        function syncDurationQuickButtons(diffMinutes) {
+            document.querySelectorAll('.dur-quick-btn').forEach(btn => {
+                const targetMins = Number(btn.getAttribute('data-dur-btn'));
+                if (targetMins === diffMinutes) {
+                    btn.className = 'dur-quick-btn py-1.5 px-2 rounded-lg text-xs font-bold border border-indigo-600 bg-indigo-600 text-white shadow-2xs transition cursor-pointer';
+                } else {
+                    btn.className = 'dur-quick-btn py-1.5 px-2 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-700 hover:border-indigo-400 transition cursor-pointer';
+                }
+            });
+        }
+
+        function onTimeSelectionChange() {
+            updatePricePreview();
+            if (state.lastAvailabilityData) {
+                renderAvailabilitySlotsGrid(state.lastAvailabilityData);
+            }
+        }
+
+        function clearSelectedAddons() {
+            state.selectedAddons = {};
+            renderBookingAddonsList();
+            updatePricePreview();
+        }
+
         function toggleBookingAddon(addonId, checked) {
             if (checked) {
                 state.selectedAddons[addonId] = 1;
@@ -869,65 +2079,162 @@
             if (badge) {
                 badge.textContent = `${count} dipilih`;
             }
+            const resetBtn = document.getElementById('bf-addons-reset-btn');
+            if (resetBtn) {
+                resetBtn.classList.toggle('hidden', count === 0);
+            }
 
             return total;
         }
 
         function renderRoomsCatalog() {
             const grid = document.getElementById('rooms-catalog-grid');
-            if (!state.rooms.length) {
-                grid.innerHTML = '<p class="text-sm text-slate-500 col-span-2">Tidak ada ruang yang sesuai dengan filter kapasitas.</p>';
+            if (!grid) return;
+
+            updateCategoryBadgesCount();
+
+            const participants = Math.max(1, Number(document.getElementById('bf-participants')?.value || 1));
+            const onlyFit = document.getElementById('filter-fit-participants')?.checked || false;
+            const sortBy = document.getElementById('catalog-sort-by')?.value || 'recommended';
+            const selectedRoomId = document.getElementById('bf-room')?.value;
+
+            let catalogRooms = state.rooms.filter(r => roomMatchesCategory(r, state.selectedCategory));
+            if (onlyFit) {
+                catalogRooms = catalogRooms.filter(r => r.capacity >= participants);
+            }
+
+            // Sort rooms based on user choice
+            catalogRooms = [...catalogRooms].sort((a, b) => {
+                if (sortBy === 'price_asc') return a.price_per_hour - b.price_per_hour;
+                if (sortBy === 'capacity_asc') return a.capacity - b.capacity;
+                if (sortBy === 'capacity_desc') return b.capacity - a.capacity;
+                // Default 'recommended': active rooms that fit participants first, sorted by closest capacity fit
+                const aFits = a.is_active && a.capacity >= participants ? 1 : 0;
+                const bFits = b.is_active && b.capacity >= participants ? 1 : 0;
+                if (aFits !== bFits) return bFits - aFits;
+                return Math.abs(a.capacity - participants) - Math.abs(b.capacity - participants);
+            });
+
+            const summaryTextEl = document.getElementById('catalog-summary-text');
+            if (summaryTextEl) {
+                const fitCount = catalogRooms.filter(r => r.is_active && r.capacity >= participants).length;
+                summaryTextEl.textContent = `Menampilkan ${catalogRooms.length} ruangan (${fitCount} ruangan muat untuk ${participants} peserta). Klik kartu untuk melihat simulasi kursi.`;
+            }
+
+            if (!catalogRooms.length) {
+                grid.innerHTML = `
+                    <div class="col-span-2 p-8 rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-center space-y-2">
+                        <p class="text-sm font-bold text-slate-700">Tidak ada ruangan yang cocok dengan filter saat ini.</p>
+                        <p class="text-xs text-slate-500">Coba pilih tab "Semua Ruang" atau kurangi jumlah peserta (${participants} orang).</p>
+                        <button type="button" onclick="document.getElementById('filter-fit-participants').checked = false; selectRoomCategory('ALL');"
+                            class="px-3.5 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold cursor-pointer">
+                            Tampilkan Semua Ruangan
+                        </button>
+                    </div>
+                `;
                 return;
             }
 
-            grid.innerHTML = state.rooms.map(room => {
+            const start = document.getElementById('bf-start')?.value || '09:00';
+            const end = document.getElementById('bf-end')?.value || '11:00';
+            const durationHours = Math.max(1, (timeToMinutes(end) - timeToMinutes(start)) / 60);
+
+            grid.innerHTML = catalogRooms.map(room => {
+                const isSelectedRoom = String(room.id) === String(selectedRoomId);
+                const catInfo = getRoomCategoryInfo(room);
+                const fitsParticipants = room.capacity >= participants;
                 const facilitiesHtml = (room.facilities || []).map(f =>
-                    `<span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-medium">${f}</span>`
+                    `<span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-medium border border-slate-200/70">${f}</span>`
                 ).join('');
                 const dimText = room.dimensions_label || `${room.length_m || 6}m × ${room.width_m || 4}m`;
                 const areaText = room.area_sqm || Math.round((room.length_m || 6) * (room.width_m || 4) * 10) / 10;
                 const layoutLabel = room.layout_label || room.layout_type || 'Boardroom';
+                const estCost = Math.round(room.price_per_hour * durationHours);
+
+                const cardBorder = isSelectedRoom
+                    ? 'border-2 border-indigo-600 bg-indigo-50/25 ring-4 ring-indigo-500/10 shadow-sm'
+                    : (room.is_active
+                        ? (fitsParticipants ? 'border border-slate-200/90 bg-white hover:border-indigo-400 hover:shadow-sm' : 'border border-amber-200 bg-amber-50/20 hover:border-amber-300')
+                        : 'border border-slate-200 bg-slate-50 opacity-70');
+
+                const fitBadge = !room.is_active
+                    ? `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">Nonaktif</span>`
+                    : (fitsParticipants
+                        ? `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">✓ Muat (${participants}/${room.capacity} Kursi)</span>`
+                        : `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">⚠ Maks. ${room.capacity} Kursi</span>`);
 
                 return `
-                    <div class="rounded-2xl border ${room.is_active ? 'border-slate-200 bg-white' : 'border-slate-200 bg-slate-50 opacity-75'} p-4 flex flex-col justify-between gap-3 hover:border-indigo-300 transition">
-                        <div class="space-y-2.5">
-                            <div class="flex items-start justify-between gap-2">
-                                <div>
-                                    <h3 class="font-extrabold text-slate-900 text-base">${room.name}</h3>
-                                    <p class="text-xs text-slate-500 font-medium">
-                                        Kapasitas maks. <strong class="text-slate-800">${room.capacity} peserta</strong>
-                                        • Dimensi <strong class="font-mono-code text-indigo-700">${dimText}</strong> (${areaText} m²)
-                                    </p>
-                                </div>
-                                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold ${room.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}">
-                                    ${room.is_active ? 'Tersedia' : 'Nonaktif'}
+                    <div onclick="if(${room.is_active ? 'true' : 'false'}) selectRoomForBooking(${room.id})"
+                        class="rounded-2xl ${cardBorder} p-4 flex flex-col justify-between gap-3.5 transition ${room.is_active ? 'cursor-pointer' : ''}">
+                        <div class="space-y-3">
+                            <!-- Card Top Badges -->
+                            <div class="flex flex-wrap items-center justify-between gap-1.5">
+                                <span class="px-2.5 py-0.5 rounded-lg border text-[10px] font-extrabold uppercase tracking-wider ${catInfo.badgeClass || 'bg-indigo-50 text-indigo-700 border-indigo-200'}">
+                                    ${catInfo.label}
                                 </span>
+                                ${fitBadge}
                             </div>
 
-                            <!-- Mini Room Blueprint Preview -->
-                            <div class="rounded-xl bg-slate-900 p-2 border border-slate-800">
+                            <!-- Room Title & Description -->
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="font-extrabold text-slate-900 text-base">${room.name}</h3>
+                                    ${isSelectedRoom ? `<span class="px-2 py-0.5 rounded-md bg-indigo-600 text-white text-[10px] font-extrabold uppercase">✓ Terpilih</span>` : ''}
+                                </div>
+                                <p class="text-[11px] text-slate-500 mt-0.5">${catInfo.desc || ''}</p>
+                            </div>
+
+                            <!-- 3 Key Specs Grid -->
+                            <div class="grid grid-cols-3 gap-1.5 text-center">
+                                <div class="p-2 rounded-xl bg-slate-50 border border-slate-200/70">
+                                    <span class="block text-[10px] text-slate-400 font-semibold uppercase">Kapasitas</span>
+                                    <span class="block text-xs font-extrabold text-slate-800">${room.capacity} Kursi</span>
+                                </div>
+                                <div class="p-2 rounded-xl bg-slate-50 border border-slate-200/70">
+                                    <span class="block text-[10px] text-slate-400 font-semibold uppercase">Dimensi</span>
+                                    <span class="block text-xs font-mono-code font-bold text-indigo-700">${dimText}</span>
+                                </div>
+                                <div class="p-2 rounded-xl bg-slate-50 border border-slate-200/70">
+                                    <span class="block text-[10px] text-slate-400 font-semibold uppercase">Luas</span>
+                                    <span class="block text-xs font-mono-code font-bold text-slate-800">${areaText} m²</span>
+                                </div>
+                            </div>
+
+                            <!-- Mini Room Blueprint Preview (Reflecting actual participant occupancy) -->
+                            <div class="rounded-xl bg-slate-900 p-2.5 border border-slate-800">
                                 <div class="flex items-center justify-between text-[10px] text-slate-300 px-1 pb-1">
-                                    <span class="font-bold text-indigo-300">Layout: ${layoutLabel}</span>
-                                    <span class="font-mono-code">${dimText} (${areaText} m²)</span>
+                                    <span class="font-bold text-indigo-300">${layoutLabel}</span>
+                                    <span class="text-emerald-400 font-semibold">${Math.min(participants, room.capacity)}/${room.capacity} kursi terisi</span>
                                 </div>
                                 <div class="h-28 w-full flex items-center justify-center">
-                                    ${generateRoomBlueprintSvg(room, room.capacity, true)}
+                                    ${generateRoomBlueprintSvg(room, Math.min(participants, room.capacity), true)}
                                 </div>
                             </div>
 
-                            <div class="flex flex-wrap gap-1.5 pt-0.5">${facilitiesHtml}</div>
+                            <!-- Included Facilities -->
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Fasilitas Bawaan:</span>
+                                <div class="flex flex-wrap gap-1">${facilitiesHtml}</div>
+                            </div>
                         </div>
 
-                        <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+                        <!-- Card Footer: Pricing & Action Buttons -->
+                        <div class="flex items-center justify-between pt-3 border-t border-slate-100" onclick="event.stopPropagation()">
                             <div>
-                                <span class="text-[11px] text-slate-400 block">Tarif Sewa</span>
-                                <span class="text-sm font-extrabold text-indigo-700 font-mono-code">${formatRupiah(room.price_per_hour)}<span class="text-xs font-normal text-slate-500">/jam</span></span>
+                                <span class="text-sm font-extrabold text-indigo-700 font-mono-code block">${formatRupiah(room.price_per_hour)}<span class="text-xs font-normal text-slate-500"> / jam</span></span>
+                                <span class="text-[10px] text-slate-400">Estimasi ${durationHours} jam: <strong class="text-slate-600 font-mono-code">${formatRupiah(estCost)}</strong></span>
                             </div>
                             ${room.is_active ? `
-                                <button type="button" onclick="selectRoomForBooking(${room.id})"
-                                    class="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white transition cursor-pointer">
-                                    Pilih &amp; Lihat Denah
-                                </button>
+                                <div class="flex items-center gap-1.5">
+                                    <button type="button" onclick="selectRoomForBooking(${room.id})"
+                                        class="px-3 py-2 rounded-xl text-xs font-bold ${isSelectedRoom ? 'bg-indigo-100 text-indigo-800 border border-indigo-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'} transition cursor-pointer">
+                                        ${isSelectedRoom ? '✓ Dipilih' : 'Pilih'}
+                                    </button>
+                                    <button type="button" onclick="selectRoomForBooking(${room.id}); goToBookingStep(2);"
+                                        class="px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs transition cursor-pointer">
+                                        Pilih &amp; Lanjut &rarr;
+                                    </button>
+                                </div>
                             ` : `<span class="text-xs text-slate-400 font-semibold">Tidak dapat dipesan</span>`}
                         </div>
                     </div>
@@ -935,14 +2242,26 @@
             }).join('');
         }
 
-        function selectRoomForBooking(roomId) {
+        function selectRoomForBooking(roomId, targetDate = null) {
             const bfRoom = document.getElementById('bf-room');
             bfRoom.value = roomId;
+            if (targetDate) {
+                document.getElementById('bf-date').value = targetDate;
+                switchTab('booking');
+            }
             onBookingRoomOrDateChange();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            const room = state.rooms.find(r => String(r.id) === String(roomId));
+            if (room) {
+                showToast('info', `${room.name} Dipilih`, `Kapasitas maks. ${room.capacity} peserta (${formatRupiah(room.price_per_hour)}/jam). Lanjut pilih tanggal & jam rapat.`);
+            }
+            if (targetDate) {
+                goToBookingStep(2);
+            }
         }
 
         function onBookingRoomOrDateChange() {
+            syncQuickDateButtons();
+            renderRoomsCatalog();
             updatePricePreview();
             loadRoomAvailability();
         }
@@ -1132,6 +2451,7 @@
             const participants = Number(document.getElementById('bf-participants').value || 0);
 
             const metaEl = document.getElementById('bf-room-meta');
+            const capBadgeEl = document.getElementById('bf-capacity-status-badge');
             const durationEl = document.getElementById('bf-duration-label');
             const roomPriceEl = document.getElementById('bf-room-price-preview');
             const addonsPriceEl = document.getElementById('bf-addons-price-preview');
@@ -1147,10 +2467,21 @@
             const areaSqm = room.area_sqm || Math.round((room.length_m || 6) * (room.width_m || 4) * 10) / 10;
             metaEl.textContent = `Kapasitas: maks. ${room.capacity} orang • Ukuran: ${dimLabel} (${areaSqm} m²) • Fasilitas Bawaan: ${(room.facilities || []).join(', ')}`;
 
+            if (capBadgeEl) {
+                if (participants <= 0 || participants > room.capacity) {
+                    capBadgeEl.textContent = `Melebihi Kapasitas (${participants}/${room.capacity} org)`;
+                    capBadgeEl.className = 'text-[11px] font-bold px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200';
+                } else {
+                    capBadgeEl.textContent = `${participants} / ${room.capacity} Kursi Terpakai`;
+                    capBadgeEl.className = 'text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200';
+                }
+            }
+
             renderSelectedRoomBlueprint(room, participants);
 
             const diffMinutes = timeToMinutes(end) - timeToMinutes(start);
             const hours = diffMinutes / 60;
+            syncDurationQuickButtons(diffMinutes);
 
             if (diffMinutes <= 0) {
                 durationEl.textContent = 'Jam selesai harus setelah jam mulai';
@@ -1163,7 +2494,7 @@
                 return;
             }
 
-            durationEl.textContent = `${hours} Jam (${diffMinutes} menit)`;
+            durationEl.textContent = `${hours} Jam (${diffMinutes} menit) • ${start} – ${end} WIB`;
 
             if (diffMinutes < 60 || diffMinutes > 480) {
                 durationEl.className = 'font-bold text-rose-600';
@@ -1171,7 +2502,7 @@
                 hintEl.className = 'text-[11px] text-rose-600 font-semibold';
             } else if (participants <= 0 || participants > room.capacity) {
                 durationEl.className = 'font-bold text-amber-600';
-                hintEl.textContent = `⚠ Jumlah peserta (${participants} orang) melebihi kapasitas ${room.name} (${room.capacity} orang).`;
+                hintEl.textContent = `⚠ Jumlah peserta (${participants} orang) melebihi kapasitas ${room.name} (${room.capacity} orang). Silakan kurangi peserta atau pilih ruang yang lebih besar.`;
                 hintEl.className = 'text-[11px] text-rose-600 font-semibold';
             } else {
                 durationEl.className = 'font-bold text-slate-800';
@@ -1186,6 +2517,48 @@
             if (roomPriceEl) roomPriceEl.textContent = formatRupiah(roomTotal);
             if (addonsPriceEl) addonsPriceEl.textContent = formatRupiah(addonsTotal);
             priceEl.textContent = formatRupiah(total);
+            updateWizardReviewSummary();
+        }
+
+        function renderAvailabilitySlotsGrid(data) {
+            const slotsGrid = document.getElementById('avail-slots-grid');
+            if (!slotsGrid || !data) return;
+
+            const selectedStart = timeToMinutes(document.getElementById('bf-start')?.value || '09:00');
+            const selectedEnd = timeToMinutes(document.getElementById('bf-end')?.value || '11:00');
+
+            slotsGrid.innerHTML = (data.slots || []).map(slot => {
+                const slotStartMins = timeToMinutes(slot.start_time);
+                const isSelectedSlot = slot.is_available && slotStartMins >= selectedStart && slotStartMins < selectedEnd;
+
+                if (isSelectedSlot) {
+                    return `
+                        <button type="button" onclick="pickSlotStartTime('${slot.start_time}')"
+                            title="Sedang dipilih: ${slot.start_time} - ${slot.end_time} WIB (Klik untuk jadikan jam mulai)"
+                            class="px-2 py-2 rounded-xl border-2 border-indigo-600 bg-indigo-600 text-white text-center shadow-xs transition cursor-pointer">
+                            <span class="block font-mono-code text-xs font-extrabold">${slot.start_time}</span>
+                            <span class="block text-[10px] font-bold">Dipilih ✓</span>
+                        </button>
+                    `;
+                } else if (slot.is_available) {
+                    return `
+                        <button type="button" onclick="pickSlotStartTime('${slot.start_time}')"
+                            title="Klik untuk memilih jam mulai ${slot.start_time} WIB"
+                            class="px-2 py-2 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-600 text-emerald-900 hover:text-white text-center transition cursor-pointer">
+                            <span class="block font-mono-code text-xs font-bold">${slot.start_time}</span>
+                            <span class="block text-[10px] opacity-75">Kosong</span>
+                        </button>
+                    `;
+                } else {
+                    return `
+                        <div title="Sudah terisi pada ${slot.start_time} - ${slot.end_time} WIB"
+                            class="px-2 py-2 rounded-xl border border-rose-200 bg-rose-100/80 text-rose-800 text-center opacity-85 cursor-not-allowed">
+                            <span class="block font-mono-code text-xs font-bold line-through">${slot.start_time}</span>
+                            <span class="block text-[10px] font-semibold">Terisi</span>
+                        </div>
+                    `;
+                }
+            }).join('');
         }
 
         async function loadRoomAvailability() {
@@ -1194,7 +2567,7 @@
             if (!roomId || !date) return;
 
             const room = state.rooms.find(r => String(r.id) === String(roomId));
-            document.getElementById('avail-date-badge').textContent = `${room ? room.name : ''} • ${date}`;
+            document.getElementById('avail-date-badge').textContent = `${room ? room.name : ''} • ${formatFriendlyDateWib(date)}`;
 
             try {
                 const res = await fetch(`/api/rooms/${roomId}/availability?date=${encodeURIComponent(date)}`);
@@ -1202,18 +2575,19 @@
                 if (!res.ok) return;
 
                 const data = json.data;
+                state.lastAvailabilityData = data;
                 const freeContainer = document.getElementById('avail-free-ranges');
                 const bookedContainer = document.getElementById('avail-booked-ranges');
-                const slotsGrid = document.getElementById('avail-slots-grid');
 
                 if (!data.available_slots || !data.available_slots.length) {
                     freeContainer.innerHTML = '<p class="text-rose-700 font-semibold">Tidak ada slot kosong pada tanggal ini.</p>';
                 } else {
                     freeContainer.innerHTML = data.available_slots.map(s => `
-                        <div class="flex items-center justify-between bg-white/80 px-2.5 py-1.5 rounded-lg border border-emerald-200/80">
-                            <span class="font-mono-code font-bold text-emerald-900">${s.start_time} – ${s.end_time} WIB</span>
-                            <span class="text-[11px] text-emerald-700 font-semibold">${(s.duration_minutes / 60)} jam tersedia</span>
-                        </div>
+                        <button type="button" onclick="pickSlotStartTime('${s.start_time}')"
+                            class="w-full flex items-center justify-between bg-white/90 hover:bg-emerald-600 hover:text-white px-3 py-2 rounded-xl border border-emerald-200/80 transition cursor-pointer group">
+                            <span class="font-mono-code font-bold text-emerald-900 group-hover:text-white">${s.start_time} – ${s.end_time} WIB</span>
+                            <span class="text-[11px] text-emerald-700 group-hover:text-emerald-100 font-semibold">${(s.duration_minutes / 60)} jam tersedia · Pilih &rarr;</span>
+                        </button>
                     `).join('');
                 }
 
@@ -1221,33 +2595,14 @@
                     bookedContainer.innerHTML = '<p class="text-slate-500">Seluruh jam operasional 08:00–21:00 WIB masih kosong.</p>';
                 } else {
                     bookedContainer.innerHTML = data.booked_slots.map(b => `
-                        <div class="flex items-center justify-between bg-white/80 px-2.5 py-1.5 rounded-lg border border-rose-200/80">
+                        <div class="flex items-center justify-between bg-white/80 px-3 py-2 rounded-xl border border-rose-200/80">
                             <span class="font-mono-code font-bold text-rose-900">${b.start_time} – ${b.end_time} WIB</span>
                             <span class="text-[11px] text-rose-700 font-semibold truncate max-w-[140px]">${b.booker_name}</span>
                         </div>
                     `).join('');
                 }
 
-                slotsGrid.innerHTML = (data.slots || []).map(slot => {
-                    if (slot.is_available) {
-                        return `
-                            <button type="button" onclick="pickSlotStartTime('${slot.start_time}')"
-                                title="Klik untuk memilih jam mulai ${slot.start_time} WIB"
-                                class="px-2 py-2 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-600 text-emerald-900 hover:text-white text-center transition cursor-pointer">
-                                <span class="block font-mono-code text-xs font-bold">${slot.start_time}</span>
-                                <span class="block text-[10px] opacity-75">Kosong</span>
-                            </button>
-                        `;
-                    } else {
-                        return `
-                            <div title="Sudah terisi pada ${slot.start_time} - ${slot.end_time} WIB"
-                                class="px-2 py-2 rounded-xl border border-rose-200 bg-rose-100/80 text-rose-800 text-center opacity-85 cursor-not-allowed">
-                                <span class="block font-mono-code text-xs font-bold line-through">${slot.start_time}</span>
-                                <span class="block text-[10px] font-semibold">Terisi</span>
-                            </div>
-                        `;
-                    }
-                }).join('');
+                renderAvailabilitySlotsGrid(data);
             } catch (e) {
                 console.error(e);
             }
@@ -1256,15 +2611,17 @@
         function pickSlotStartTime(startTime) {
             const startSelect = document.getElementById('bf-start');
             const endSelect = document.getElementById('bf-end');
+            const prevDuration = Math.max(60, Math.min(480, timeToMinutes(endSelect.value) - timeToMinutes(startSelect.value) || 120));
             startSelect.value = startTime;
 
             const startMins = timeToMinutes(startTime);
-            const targetEndMins = Math.min(21 * 60, startMins + 120);
-            const eh = String(Math.floor(targetEndMins / 60)).padStart(2, '0');
-            const em = String(targetEndMins % 60).padStart(2, '0');
+            const targetEndMins = Math.min(21 * 60, startMins + prevDuration);
+            const finalEndMins = Math.max(startMins + 60, targetEndMins);
+            const eh = String(Math.floor(finalEndMins / 60)).padStart(2, '0');
+            const em = String(finalEndMins % 60).padStart(2, '0');
             endSelect.value = `${eh}:${em}`;
 
-            updatePricePreview();
+            onTimeSelectionChange();
         }
 
         async function submitBooking(e) {
@@ -1275,6 +2632,7 @@
             }));
 
             const payload = {
+                user_id: state.loggedInCustomer?.id || null,
                 room_id: Number(document.getElementById('bf-room').value),
                 date: document.getElementById('bf-date').value,
                 start_time: document.getElementById('bf-start').value,
@@ -1304,10 +2662,11 @@
                         `Ruang berhasil dipesan atas nama ${b.booker_name} pada ${b.date} pukul ${b.start_hour}–${b.end_hour} WIB.${addonsSummary} Total tagihan QRIS: ${formatRupiah(b.total_price)}. Silakan selesaikan pembayaran QRIS pada jendela yang muncul.`,
                         201
                     );
-                    document.getElementById('bf-name').value = '';
-                    document.getElementById('bf-contact').value = '';
+                    document.getElementById('bf-name').value = state.loggedInCustomer?.name || '';
+                    document.getElementById('bf-contact').value = state.loggedInCustomer?.phone || state.loggedInCustomer?.email || '';
                     state.selectedAddons = {};
                     renderBookingAddonsList();
+                    goToBookingStep(1);
                     await refreshAllData();
                     openQrisModal(b.id);
                 } else {
@@ -1337,9 +2696,41 @@
             loadCalendar();
         }
 
+        function shiftCalendarDate(deltaDays) {
+            const calDateEl = document.getElementById('cal-date');
+            if (!calDateEl) return;
+            const step = state.calendarView === 'week' ? deltaDays * 7 : deltaDays;
+            calDateEl.value = addDaysToDateString(calDateEl.value || getTodayWibString(), step);
+            loadCalendar();
+        }
+
+        function resetCalendarToToday() {
+            const calDateEl = document.getElementById('cal-date');
+            if (!calDateEl) return;
+            calDateEl.value = getTodayWibString();
+            loadCalendar();
+        }
+
+        function resetBookingsFilter() {
+            const payEl = document.getElementById('bl-payment-filter');
+            const statEl = document.getElementById('bl-status-filter');
+            const roomEl = document.getElementById('bl-room-filter');
+            const searchEl = document.getElementById('bl-search');
+            if (payEl) payEl.value = '';
+            if (statEl) statEl.value = '';
+            if (roomEl) roomEl.value = '';
+            if (searchEl) searchEl.value = '';
+            loadBookingsList();
+        }
+
         async function loadCalendar() {
             const date = document.getElementById('cal-date').value || getTodayWibString();
             const roomId = document.getElementById('cal-room-filter').value;
+            const activeDateLabel = document.getElementById('cal-active-date-label');
+            if (activeDateLabel) {
+                activeDateLabel.textContent = `Menampilkan jadwal mulai: ${formatFriendlyDateWib(date)}`;
+            }
+
             const params = new URLSearchParams({ date, view: state.calendarView });
             if (roomId) params.set('room_id', roomId);
 
@@ -1368,21 +2759,32 @@
                         : `<p class="text-xs text-emerald-700 font-medium py-2">✓ Tersedia sepanjang jam operasional (08:00 – 21:00 WIB)</p>`;
 
                     return `
-                        <div class="p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 space-y-2.5">
-                            <div class="flex items-center justify-between">
-                                <h4 class="font-extrabold text-sm text-slate-900">${r.room_name}</h4>
-                                <span class="text-[11px] font-semibold text-slate-500">Kapasitas ${r.capacity} org</span>
+                        <div class="p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 space-y-2.5 flex flex-col justify-between">
+                            <div class="space-y-2.5">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h4 class="font-extrabold text-sm text-slate-900">${r.room_name}</h4>
+                                        <span class="text-[11px] font-semibold text-slate-500">Kapasitas maks. ${r.capacity} org</span>
+                                    </div>
+                                    ${r.is_active ? `
+                                        <button type="button" onclick="selectRoomForBooking(${r.room_id}, '${dayObj.date}')"
+                                            class="px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200 text-[11px] font-bold transition cursor-pointer">
+                                            + Pesan Ruang Ini
+                                        </button>
+                                    ` : `<span class="text-[10px] font-bold text-rose-600">Nonaktif</span>`}
+                                </div>
+                                <div class="space-y-2">${bookingsHtml}</div>
                             </div>
-                            <div class="space-y-2">${bookingsHtml}</div>
                         </div>
                     `;
                 }).join('');
 
                 return `
                     <div class="space-y-3">
-                        <div class="flex items-center gap-2">
+                        <div class="flex flex-wrap items-center gap-2">
                             <span class="px-3 py-1 rounded-full bg-slate-900 text-white font-mono-code text-xs font-bold">${dayObj.date}</span>
-                            <span class="text-xs text-slate-500">Jam Operasional 08:00 – 21:00 WIB</span>
+                            <span class="text-xs font-bold text-indigo-700">${formatFriendlyDateWib(dayObj.date)}</span>
+                            <span class="text-xs text-slate-400">• Jam Operasional 08:00 – 21:00 WIB</span>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">${roomsHtml}</div>
                     </div>
@@ -1401,10 +2803,21 @@
             if (paymentStatus) params.set('payment_status', paymentStatus);
             if (roomId) params.set('room_id', roomId);
             if (search) params.set('booker_name', search);
+            if (state.loggedInCustomer?.id) {
+                params.set('user_id', state.loggedInCustomer.id);
+                if (state.loggedInCustomer.phone) {
+                    params.set('customer_contact', state.loggedInCustomer.phone);
+                }
+            }
 
             const res = await fetch(`/api/bookings?${params.toString()}`);
             const json = await res.json();
             state.bookings = json.data || [];
+
+            const countBadge = document.getElementById('tab-bookings-count-badge');
+            if (countBadge && !status && !paymentStatus && !roomId && !search) {
+                countBadge.textContent = state.bookings.length;
+            }
 
             const tbody = document.getElementById('bookings-table-body');
             if (!state.bookings.length) {
@@ -1441,6 +2854,7 @@
                         </td>
                         <td class="py-3.5 px-4 font-mono-code text-xs">
                             <span class="font-bold text-slate-800 block">${b.date}</span>
+                            <span class="font-sans text-[11px] text-slate-500 block">${formatFriendlyDateWib(b.date)}</span>
                             <span class="text-indigo-600 font-semibold">${b.start_hour} – ${b.end_hour} WIB (${b.duration_hours} jam)</span>
                         </td>
                         <td class="py-3.5 px-4 text-xs font-semibold text-slate-700">${b.participants} orang</td>
@@ -1458,7 +2872,7 @@
                         <td class="py-3.5 px-4 text-right space-y-1.5">
                             <button onclick="openQrisModal(${b.id})"
                                 class="w-full px-3 py-1.5 rounded-xl ${isPaid ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs'} text-xs font-bold transition cursor-pointer">
-                                ${isPaid ? 'Lihat Bukti QRIS' : 'Bayar QRIS'}
+                                ${isPaid ? 'Lihat / Cetak Nota' : 'Bayar QRIS & Nota'}
                             </button>
                             ${isConfirmed ? `
                                 <button onclick="cancelBooking(${b.id})"
@@ -1558,13 +2972,17 @@
             `;
         }
 
+        function printOfficialInvoice() {
+            window.print();
+        }
+
         async function openQrisModal(bookingId) {
             currentQrisBookingId = bookingId;
             try {
                 const res = await fetch(`/api/bookings/${bookingId}/qris`);
                 const json = await res.json();
                 if (!res.ok || !json.data) {
-                    showAlert('error', 'Gagal Memuat QRIS', json.message || 'Tidak dapat memuat detail pembayaran QRIS.');
+                    showAlert('error', 'Gagal Memuat Nota & QRIS', json.message || 'Tidak dapat memuat detail nota dan pembayaran QRIS.');
                     return;
                 }
 
@@ -1572,47 +2990,134 @@
                 const b = q.booking;
                 const isPaid = q.payment_status === 'PAID';
                 const isCancelled = b.status === 'CANCELLED';
+                const roomName = b.room ? b.room.name : `Ruang #${b.room_id}`;
+                const roomRate = b.room && b.room.price_per_hour
+                    ? b.room.price_per_hour
+                    : (b.duration_hours > 0 ? Math.round((q.room_price || 0) / b.duration_hours) : 0);
 
+                const dateCompact = (b.date || getTodayWibString()).replace(/-/g, '');
+                const paddedId = String(q.booking_id || b.id).padStart(4, '0');
+                const invNumber = `INV/RK/${dateCompact}/${paddedId}`;
+
+                const nowFormatted = new Intl.DateTimeFormat('id-ID', {
+                    timeZone: 'Asia/Jakarta',
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                }).format(new Date()) + ' WIB';
+
+                document.getElementById('qm-invoice-number').textContent = invNumber;
                 document.getElementById('qm-booking-code').textContent = `${q.booking_code} (#${q.booking_id})`;
+                document.getElementById('qm-issued-at').textContent = `Dicetak: ${nowFormatted}`;
                 document.getElementById('qm-total-amount').textContent = formatRupiah(q.total_price);
-                document.getElementById('qm-reference').textContent = `Ref: ${q.payment_reference} • Metode: QRIS`;
+                document.getElementById('qm-reference').textContent = `Ref: ${q.payment_reference} • Metode: QRIS Nasional`;
                 document.getElementById('qm-qr-container').innerHTML = generateQrisSvg(q.qris_payload);
 
-                document.getElementById('qm-room-info').textContent = `${b.room ? b.room.name : 'Ruang #' + b.room_id} (${b.participants} peserta)`;
-                document.getElementById('qm-schedule-info').textContent = `${b.date} • ${b.start_hour}–${b.end_hour} WIB (${b.duration_hours} jam)`;
-                document.getElementById('qm-booker-info').textContent = `${b.booker_name} (${b.booker_contact})`;
+                document.getElementById('qm-booker-name').textContent = b.booker_name || '-';
+                document.getElementById('qm-booker-contact').textContent = `Kontak: ${b.booker_contact || '-'}`;
+
+                const bookingStatusEl = document.getElementById('qm-booking-status-text');
+                if (bookingStatusEl) {
+                    bookingStatusEl.textContent = b.status;
+                    bookingStatusEl.className = isCancelled ? 'font-extrabold text-rose-600' : 'font-extrabold text-emerald-700';
+                }
+
+                document.getElementById('qm-room-info').textContent = `${roomName} (${b.participants} peserta)`;
+                const dateInfoEl = document.getElementById('qm-date-info');
+                if (dateInfoEl) {
+                    dateInfoEl.textContent = formatFriendlyDateWib(b.date);
+                }
+                document.getElementById('qm-schedule-info').textContent = `${b.start_hour} – ${b.end_hour} WIB (${b.duration_hours} jam)`;
                 document.getElementById('qm-room-price').textContent = formatRupiah(q.room_price);
 
-                const addonsContainer = document.getElementById('qm-addons-breakdown');
-                if (b.additional_facilities && b.additional_facilities.length) {
-                    addonsContainer.innerHTML = b.additional_facilities.map(a => `
-                        <div class="flex justify-between text-indigo-700">
-                            <span>+ ${a.name} (x${a.quantity})</span>
-                            <span class="font-mono-code font-semibold">${formatRupiah(a.subtotal)}</span>
-                        </div>
-                    `).join('');
-                } else {
-                    addonsContainer.innerHTML = '';
+                const addonsSubtotalEl = document.getElementById('qm-addons-subtotal');
+                if (addonsSubtotalEl) {
+                    addonsSubtotalEl.textContent = formatRupiah(q.additional_facilities_price || 0);
+                }
+
+                // Populate itemized invoice table rows
+                const itemsTbody = document.getElementById('qm-invoice-items-tbody');
+                if (itemsTbody) {
+                    const rows = [];
+                    rows.push(`
+                        <tr>
+                            <td class="py-3 px-3.5 font-mono-code font-bold text-slate-400">01</td>
+                            <td class="py-3 px-3.5">
+                                <span class="font-extrabold text-slate-900 block">Sewa Ruang Meeting — ${roomName}</span>
+                                <span class="text-[11px] text-slate-500">Jadwal: ${b.date} (${b.start_hour}–${b.end_hour} WIB) • ${b.participants} Peserta</span>
+                            </td>
+                            <td class="py-3 px-3.5 font-mono-code text-slate-700">${b.duration_hours} jam × ${formatRupiah(roomRate)}/jam</td>
+                            <td class="py-3 px-3.5 text-right font-mono-code font-extrabold text-slate-900">${formatRupiah(q.room_price)}</td>
+                        </tr>
+                    `);
+
+                    const addons = b.additional_facilities || [];
+                    addons.forEach((a, idx) => {
+                        const rowNum = String(idx + 2).padStart(2, '0');
+                        let calcDetail = `${a.quantity} paket × ${formatRupiah(a.unit_price)}`;
+                        if (a.pricing_type === 'PER_PARTICIPANT') {
+                            calcDetail = `${b.participants} peserta × ${formatRupiah(a.unit_price)}/peserta`;
+                        } else if (a.pricing_type === 'PER_HOUR') {
+                            calcDetail = `${a.quantity} unit × ${b.duration_hours} jam × ${formatRupiah(a.unit_price)}/jam`;
+                        }
+
+                        rows.push(`
+                            <tr>
+                                <td class="py-2.5 px-3.5 font-mono-code font-bold text-slate-400">${rowNum}</td>
+                                <td class="py-2.5 px-3.5">
+                                    <span class="font-bold text-indigo-950 block">+ ${a.name}</span>
+                                    <span class="text-[10px] text-slate-500 uppercase">Opsi Tambahan (${a.pricing_label || a.pricing_type})</span>
+                                </td>
+                                <td class="py-2.5 px-3.5 font-mono-code text-slate-700">${calcDetail}</td>
+                                <td class="py-2.5 px-3.5 text-right font-mono-code font-bold text-indigo-700">${formatRupiah(a.subtotal)}</td>
+                            </tr>
+                        `);
+                    });
+
+                    itemsTbody.innerHTML = rows.join('');
+                }
+
+                // Penalty row if cancelled with penalty
+                const penaltyRow = document.getElementById('qm-penalty-row');
+                const penaltyAmountEl = document.getElementById('qm-penalty-amount');
+                if (penaltyRow && penaltyAmountEl) {
+                    if (isCancelled && Number(b.penalty_amount || 0) > 0) {
+                        penaltyRow.classList.remove('hidden');
+                        penaltyAmountEl.textContent = formatRupiah(b.penalty_amount);
+                    } else {
+                        penaltyRow.classList.add('hidden');
+                    }
                 }
 
                 const statusBadge = document.getElementById('qm-status-badge');
                 const paidBanner = document.getElementById('qm-paid-banner');
+                const unpaidBanner = document.getElementById('qm-unpaid-banner');
+                const paidTimestamp = document.getElementById('qm-paid-timestamp');
                 const payBtn = document.getElementById('qm-pay-btn');
 
                 if (isPaid) {
-                    statusBadge.textContent = 'QRIS LUNAS (PAID)';
-                    statusBadge.className = 'px-2 py-0.5 rounded-md bg-emerald-400 text-slate-950 text-[10px] font-extrabold uppercase';
+                    statusBadge.textContent = 'LUNAS (PAID)';
+                    statusBadge.className = 'px-2.5 py-0.5 rounded-md bg-emerald-500 text-white text-[10px] font-extrabold uppercase';
                     paidBanner.classList.remove('hidden');
+                    if (unpaidBanner) unpaidBanner.classList.add('hidden');
+                    if (paidTimestamp) {
+                        paidTimestamp.textContent = `Diverifikasi pada: ${q.paid_at ? q.paid_at.replace('T', ' ').substring(0, 19) + ' WIB' : nowFormatted}`;
+                    }
                     payBtn.classList.add('hidden');
                 } else if (isCancelled) {
                     statusBadge.textContent = 'DIBATALKAN';
-                    statusBadge.className = 'px-2 py-0.5 rounded-md bg-rose-400 text-white text-[10px] font-extrabold uppercase';
+                    statusBadge.className = 'px-2.5 py-0.5 rounded-md bg-rose-500 text-white text-[10px] font-extrabold uppercase';
                     paidBanner.classList.add('hidden');
+                    if (unpaidBanner) unpaidBanner.classList.add('hidden');
                     payBtn.classList.add('hidden');
                 } else {
-                    statusBadge.textContent = 'MENUNGGU PEMBAYARAN';
-                    statusBadge.className = 'px-2 py-0.5 rounded-md bg-amber-400 text-slate-950 text-[10px] font-extrabold uppercase';
+                    statusBadge.textContent = 'BELUM BAYAR (UNPAID)';
+                    statusBadge.className = 'px-2.5 py-0.5 rounded-md bg-amber-400 text-slate-950 text-[10px] font-extrabold uppercase';
                     paidBanner.classList.add('hidden');
+                    if (unpaidBanner) unpaidBanner.classList.remove('hidden');
                     payBtn.classList.remove('hidden');
                 }
 
@@ -1701,8 +3206,13 @@
             document.getElementById('cal-date').value = today;
 
             populateTimeDropdowns();
+            syncQuickDateButtons();
             updateWibClock();
             setInterval(updateWibClock, 1000);
+
+            @if (session('auth_success'))
+                showAlert('success', 'Autentikasi Berhasil', @json(session('auth_success')));
+            @endif
 
             refreshAllData();
         });

@@ -85,7 +85,7 @@ class BookingService
             $qrisPayload = self::buildQrisPayload($bookingCode, $totalPrice);
             $paymentExpiredUtc = $nowUtc->copy()->addMinutes(15);
 
-            $booking = Booking::create([
+            $bookingData = [
                 'booking_code' => $bookingCode,
                 'room_id' => $lockedRoom->id,
                 'booker_name' => trim((string) $payload['booker_name']),
@@ -105,7 +105,13 @@ class BookingService
                 'status' => Booking::STATUS_CONFIRMED,
                 'cancelled_at' => null,
                 'penalty_amount' => 0,
-            ]);
+            ];
+
+            if (! empty($payload['user_id']) && \Illuminate\Support\Facades\Schema::hasColumn('bookings', 'user_id')) {
+                $bookingData['user_id'] = (int) $payload['user_id'];
+            }
+
+            $booking = Booking::create($bookingData);
 
             $createdItems = collect();
             foreach ($resolvedAddonItems as $itemData) {

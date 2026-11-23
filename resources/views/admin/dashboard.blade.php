@@ -43,6 +43,10 @@
             </div>
 
             <div class="flex items-center gap-3">
+                <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-medium text-slate-200">
+                    <span id="adm-today-badge" class="font-mono-code">Hari Ini (WIB)</span>
+                </div>
+
                 <a href="{{ url('/') }}"
                     class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 transition">
                     Lihat Halaman Pemesan &rarr;
@@ -367,15 +371,26 @@
                 <div>
                     <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">FR-11 · Monitoring Jadwal</span>
                     <h2 class="text-xl font-extrabold text-slate-900">Kalender Operasional Seluruh Ruang</h2>
+                    <p id="adm-cal-friendly-label" class="text-xs font-semibold text-slate-500 mt-0.5"></p>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-3">
+                <div class="flex flex-wrap items-center gap-2.5">
                     <select id="adm-cal-room" onchange="loadAdminCalendar()"
                         class="rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-800">
                         <option value="">Semua Ruang</option>
                     </select>
-                    <input type="date" id="adm-cal-date" onchange="loadAdminCalendar()"
-                        class="rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-800">
+                    <div class="inline-flex items-center rounded-xl border border-slate-300 bg-slate-50 p-0.5">
+                        <button type="button" onclick="shiftAdminCalendarDate(-1)" title="Hari Sebelumnya"
+                            class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-700 hover:bg-white transition cursor-pointer">&larr;</button>
+                        <input type="date" id="adm-cal-date" onchange="loadAdminCalendar()"
+                            class="bg-transparent px-2 py-1 text-xs font-bold text-slate-800 focus:outline-none">
+                        <button type="button" onclick="shiftAdminCalendarDate(1)" title="Hari Berikutnya"
+                            class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-700 hover:bg-white transition cursor-pointer">&rarr;</button>
+                    </div>
+                    <button type="button" onclick="document.getElementById('adm-cal-date').value = getTodayWibString(); loadAdminCalendar();"
+                        class="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition cursor-pointer">
+                        Hari Ini
+                    </button>
                     <select id="adm-cal-view" onchange="loadAdminCalendar()"
                         class="rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-800">
                         <option value="day">Tampilan Harian</option>
@@ -409,6 +424,41 @@
                 month: '2-digit',
                 day: '2-digit'
             }).format(new Date());
+        }
+
+        function addDaysToDateString(baseDateStr, offsetDays) {
+            const [y, m, d] = (baseDateStr || getTodayWibString()).split('-').map(Number);
+            const dt = new Date(Date.UTC(y, m - 1, d + offsetDays));
+            const yy = dt.getUTCFullYear();
+            const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+            const dd = String(dt.getUTCDate()).padStart(2, '0');
+            return `${yy}-${mm}-${dd}`;
+        }
+
+        function formatFriendlyDateWib(dateStr) {
+            if (!dateStr) return '-';
+            const [y, m, d] = dateStr.split('-').map(Number);
+            if (!y || !m || !d) return dateStr;
+            const dt = new Date(Date.UTC(y, m - 1, d, 5, 0, 0));
+            const formatted = new Intl.DateTimeFormat('id-ID', {
+                timeZone: 'Asia/Jakarta',
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            }).format(dt);
+            const today = getTodayWibString();
+            if (dateStr === today) return `Hari Ini • ${formatted}`;
+            return formatted;
+        }
+
+        function shiftAdminCalendarDate(deltaDays) {
+            const calDateEl = document.getElementById('adm-cal-date');
+            const viewEl = document.getElementById('adm-cal-view');
+            if (!calDateEl) return;
+            const step = (viewEl && viewEl.value === 'week') ? deltaDays * 7 : deltaDays;
+            calDateEl.value = addDaysToDateString(calDateEl.value || getTodayWibString(), step);
+            loadAdminCalendar();
         }
 
         function showAdminAlert(type, title, message, status = null) {
@@ -813,6 +863,10 @@
             const date = document.getElementById('adm-cal-date').value || getTodayWibString();
             const roomId = document.getElementById('adm-cal-room').value;
             const view = document.getElementById('adm-cal-view').value;
+            const friendlyLabel = document.getElementById('adm-cal-friendly-label');
+            if (friendlyLabel) {
+                friendlyLabel.textContent = `Menampilkan jadwal mulai: ${formatFriendlyDateWib(date)}`;
+            }
 
             const params = new URLSearchParams({ date, view });
             if (roomId) params.set('room_id', roomId);
@@ -825,8 +879,9 @@
 
             container.innerHTML = (json.data.days || []).map(dayObj => `
                 <div class="space-y-3">
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
                         <span class="px-3 py-1 rounded-full bg-slate-900 text-white font-mono-code text-xs font-bold">${dayObj.date}</span>
+                        <span class="text-xs font-bold text-indigo-700">${formatFriendlyDateWib(dayObj.date)}</span>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         ${(dayObj.rooms || []).map(r => `
@@ -843,7 +898,7 @@
                                         </div>
                                         <span class="font-mono-code font-bold">${formatRupiah(b.total_price)}</span>
                                     </div>
-                                `).join('') : '<p class="text-xs text-slate-400 italic">Tidak ada jadwal booking.</p>'}
+                                `).join('') : '<p class="text-xs text-emerald-700 font-medium">✓ Tersedia sepanjang hari (08:00 – 21:00 WIB)</p>'}
                             </div>
                         `).join('')}
                     </div>
@@ -863,7 +918,12 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('adm-cal-date').value = getTodayWibString();
+            const today = getTodayWibString();
+            document.getElementById('adm-cal-date').value = today;
+            const badge = document.getElementById('adm-today-badge');
+            if (badge) {
+                badge.textContent = formatFriendlyDateWib(today);
+            }
             refreshAdminData();
         });
     </script>

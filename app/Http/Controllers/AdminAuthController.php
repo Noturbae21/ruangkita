@@ -38,8 +38,19 @@ class AdminAuthController extends Controller
 
         $user = User::where('email', $email)->first();
 
-        $isValidUser = $user && Hash::check($password, $user->password);
+        $hasRoleCol = \Illuminate\Support\Facades\Schema::hasColumn('users', 'role');
+        $isAdminAccount = $user && ((! $hasRoleCol && $email === 'admin@ruangkita.id') || ($hasRoleCol && ($user->role === 'admin' || $email === 'admin@ruangkita.id')));
+
+        $isValidUser = $isAdminAccount && Hash::check($password, $user->password);
         $isValidFallbackAdmin = ($email === 'admin@ruangkita.id' && in_array($password, ['password', $configuredToken], true));
+
+        if ($user && ! $isAdminAccount) {
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors([
+                    'email' => 'Akun ini adalah akun Penyewa (Customer) dan tidak memiliki akses ke Dashboard Admin.',
+                ]);
+        }
 
         if ($isValidUser || $isValidFallbackAdmin) {
             $request->session()->put('is_admin', true);
