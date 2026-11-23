@@ -236,27 +236,46 @@
                             class="w-full rounded-xl border border-slate-300 bg-slate-50/50 px-3.5 py-2.5 text-sm font-medium text-slate-900 focus:border-indigo-600 focus:bg-white focus:outline-none">
                     </div>
 
+                    <!-- Pilihan Fasilitas Tambahan (Add-ons) -->
+                    <div class="space-y-2 pt-1">
+                        <div class="flex items-center justify-between">
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">Fasilitas Tambahan (Opsional)</label>
+                            <span id="bf-addons-count-badge" class="text-[11px] font-semibold text-indigo-600">0 dipilih</span>
+                        </div>
+                        <div id="bf-addons-list" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                            <p class="text-xs text-slate-400">Memuat daftar fasilitas tambahan...</p>
+                        </div>
+                    </div>
+
                     <!-- Server Price Estimation Box -->
                     <div class="rounded-2xl bg-gradient-to-br from-indigo-50/90 to-slate-50 p-4 border border-indigo-100 space-y-2">
                         <div class="flex items-center justify-between text-xs text-slate-600">
                             <span>Durasi Rapat:</span>
                             <span id="bf-duration-label" class="font-bold text-slate-800">2 Jam</span>
                         </div>
-                        <div class="flex items-center justify-between">
+                        <div class="flex items-center justify-between text-xs text-slate-600">
+                            <span>Biaya Sewa Ruang:</span>
+                            <span id="bf-room-price-preview" class="font-bold text-slate-800 font-mono-code">Rp 0</span>
+                        </div>
+                        <div class="flex items-center justify-between text-xs text-slate-600">
+                            <span>Biaya Fasilitas Tambahan:</span>
+                            <span id="bf-addons-price-preview" class="font-bold text-indigo-700 font-mono-code">Rp 0</span>
+                        </div>
+                        <div class="flex items-center justify-between pt-1.5 border-t border-indigo-200/60">
                             <span class="text-xs font-bold uppercase tracking-wider text-indigo-900">Estimasi Total Biaya:</span>
                             <span id="bf-price-preview" class="text-lg font-extrabold text-indigo-700 font-mono-code">Rp 0</span>
                         </div>
                         <p id="bf-rule-hint" class="text-[11px] text-slate-500 leading-tight">
-                            * Total harga dihitung otomatis oleh sistem berdasarkan durasi × tarif ruang per jam.
+                            * Total harga dihitung otomatis oleh sistem berdasarkan sewa ruang + fasilitas tambahan.
                         </p>
                     </div>
 
                     <button type="submit" id="bf-submit-btn"
                         class="w-full py-3 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-sm shadow-md shadow-indigo-600/20 transition flex items-center justify-center gap-2 cursor-pointer">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                         </svg>
-                        <span>Konfirmasi Booking Sekarang</span>
+                        <span>Lanjut Pembayaran QRIS Sekarang</span>
                     </button>
                 </form>
             </div>
@@ -373,6 +392,13 @@
                     </div>
 
                     <div class="flex flex-wrap items-center gap-2.5">
+                        <select id="bl-payment-filter" onchange="loadBookingsList()"
+                            class="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
+                            <option value="">Semua Pembayaran</option>
+                            <option value="PAID">QRIS LUNAS (PAID)</option>
+                            <option value="UNPAID">BELUM BAYAR (UNPAID)</option>
+                        </select>
+
                         <select id="bl-status-filter" onchange="loadBookingsList()"
                             class="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
                             <option value="">Semua Status</option>
@@ -394,12 +420,12 @@
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-slate-50/70">
-                                <th class="py-3.5 px-4">ID</th>
-                                <th class="py-3.5 px-4">Ruang</th>
+                                <th class="py-3.5 px-4">Kode Booking</th>
+                                <th class="py-3.5 px-4">Ruang &amp; Add-on</th>
                                 <th class="py-3.5 px-4">Pemesan &amp; Kontak</th>
                                 <th class="py-3.5 px-4">Jadwal (WIB)</th>
                                 <th class="py-3.5 px-4">Peserta</th>
-                                <th class="py-3.5 px-4">Total Harga</th>
+                                <th class="py-3.5 px-4">Total &amp; QRIS</th>
                                 <th class="py-3.5 px-4">Status &amp; Denda</th>
                                 <th class="py-3.5 px-4 text-right">Aksi Pemesan</th>
                             </tr>
@@ -412,6 +438,98 @@
         </section>
 
     </main>
+
+    <!-- QRIS Payment Gateway & Invoice Modal -->
+    <div id="qris-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4 overflow-y-auto">
+        <div class="bg-white rounded-3xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden my-8">
+            <!-- Modal Header -->
+            <div class="bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-700 px-6 py-4 text-white flex items-center justify-between">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded-md bg-white/20 text-[10px] font-extrabold uppercase tracking-wider">QRIS Payment Gateway</span>
+                        <span id="qm-status-badge" class="px-2 py-0.5 rounded-md bg-amber-400 text-slate-950 text-[10px] font-extrabold uppercase">MENUNGGU PEMBAYARAN</span>
+                    </div>
+                    <h3 class="text-base font-extrabold mt-1" id="qm-booking-code">RK-20261125-0001</h3>
+                </div>
+                <button type="button" onclick="closeQrisModal()" class="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white font-bold cursor-pointer">✕</button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-6 space-y-4">
+                <!-- QRIS Card Frame -->
+                <div class="rounded-2xl border-2 border-slate-200 bg-slate-50/70 p-4 text-center space-y-3 relative overflow-hidden">
+                    <div class="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
+                        <div class="text-left">
+                            <span class="text-[10px] font-extrabold uppercase tracking-widest text-rose-600 block">QRIS · Standar Pembayaran Nasional</span>
+                            <p class="text-xs font-extrabold text-slate-900">RUANGKITA COWORKING SPACE</p>
+                            <p class="text-[10px] font-mono-code text-slate-500">NMID: ID1026000914300</p>
+                        </div>
+                        <span class="px-2.5 py-1 rounded-lg bg-rose-600 text-white text-xs font-extrabold tracking-wider">QRIS</span>
+                    </div>
+
+                    <!-- Dynamic Generated SVG QR Code -->
+                    <div id="qm-qr-container" class="mx-auto w-52 h-52 bg-white p-3 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-center">
+                    </div>
+
+                    <div>
+                        <p class="text-[11px] text-slate-500">Total Tagihan Pembayaran</p>
+                        <p id="qm-total-amount" class="text-2xl font-extrabold text-indigo-700 font-mono-code">Rp 0</p>
+                        <p id="qm-reference" class="text-[10px] font-mono-code text-slate-400 mt-0.5">Ref: -</p>
+                    </div>
+
+                    <!-- Paid Stamp Overlay -->
+                    <div id="qm-paid-banner" class="hidden rounded-xl bg-emerald-50 border border-emerald-200 p-2.5 text-emerald-800 text-xs font-bold">
+                        ✓ PEMBAYARAN QRIS LUNAS DIVERIFIKASI
+                    </div>
+                </div>
+
+                <!-- Booking & Add-ons Invoice Breakdown -->
+                <div class="rounded-2xl bg-slate-50 border border-slate-200/80 p-3.5 text-xs space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Ruang &amp; Peserta:</span>
+                        <span id="qm-room-info" class="font-bold text-slate-900 text-right">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Jadwal Rapat (WIB):</span>
+                        <span id="qm-schedule-info" class="font-mono-code font-bold text-indigo-700 text-right">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Pemesan:</span>
+                        <span id="qm-booker-info" class="font-semibold text-slate-800 text-right">-</span>
+                    </div>
+                    <div class="border-t border-slate-200/80 pt-2 space-y-1">
+                        <div class="flex justify-between">
+                            <span class="text-slate-600">Sewa Ruang:</span>
+                            <span id="qm-room-price" class="font-mono-code font-semibold text-slate-900">Rp 0</span>
+                        </div>
+                        <div id="qm-addons-breakdown" class="space-y-1"></div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="space-y-2 pt-1">
+                    <button type="button" id="qm-pay-btn" onclick="confirmQrisPaymentFromModal()"
+                        class="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2 cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Simulasikan Scan &amp; Bayar QRIS Sekarang</span>
+                    </button>
+
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="window.print()"
+                            class="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer">
+                            Cetak Bukti / Invoice
+                        </button>
+                        <button type="button" onclick="closeQrisModal()"
+                            class="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer">
+                            Tutup
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Footer -->
     <footer class="bg-white border-t border-slate-200/80 mt-12">
@@ -431,9 +549,17 @@
     <script>
         let state = {
             rooms: [],
+            additionalFacilities: [],
+            selectedAddons: {}, // { [facilityId]: quantity }
             bookings: [],
             calendarView: 'day',
         };
+
+        function formatPricingTypeLabel(type) {
+            if (type === 'PER_HOUR') return '/ jam';
+            if (type === 'PER_PARTICIPANT') return '/ peserta';
+            return '/ booking';
+        }
 
         function getTodayWibString() {
             const now = new Date();
@@ -617,6 +743,103 @@
             loadRoomAvailability();
         }
 
+        async function loadAdditionalFacilities() {
+            try {
+                const res = await fetch('/api/additional-facilities?is_active=1');
+                const json = await res.json();
+                state.additionalFacilities = json.data || [];
+                renderBookingAddonsList();
+                updatePricePreview();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function renderBookingAddonsList() {
+            const container = document.getElementById('bf-addons-list');
+            if (!container) return;
+
+            if (!state.additionalFacilities.length) {
+                container.innerHTML = '<p class="text-xs text-slate-400 italic">Belum ada fasilitas tambahan yang tersedia.</p>';
+                return;
+            }
+
+            container.innerHTML = state.additionalFacilities.map(addon => {
+                const isSelected = Object.prototype.hasOwnProperty.call(state.selectedAddons, addon.id);
+                const qty = isSelected ? state.selectedAddons[addon.id] : 1;
+                const showQtyInput = addon.pricing_type !== 'PER_PARTICIPANT';
+
+                return `
+                    <div class="p-2.5 rounded-xl border ${isSelected ? 'border-indigo-400 bg-indigo-50/40' : 'border-slate-200 bg-slate-50/50'} transition flex items-center justify-between gap-2.5">
+                        <label class="flex items-start gap-2.5 cursor-pointer flex-1 min-w-0">
+                            <input type="checkbox"
+                                ${isSelected ? 'checked' : ''}
+                                onchange="toggleBookingAddon(${addon.id}, this.checked)"
+                                class="mt-0.5 w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500">
+                            <div class="min-w-0 flex-1">
+                                <p class="text-xs font-bold text-slate-900 truncate">${addon.name}</p>
+                                ${addon.description ? `<p class="text-[11px] text-slate-500 line-clamp-1">${addon.description}</p>` : ''}
+                                <p class="text-[11px] font-mono-code font-bold text-indigo-700 mt-0.5">
+                                    ${formatRupiah(addon.price)} <span class="font-sans font-normal text-slate-500">${formatPricingTypeLabel(addon.pricing_type)}</span>
+                                </p>
+                            </div>
+                        </label>
+                        ${isSelected && showQtyInput ? `
+                            <div class="flex items-center gap-1">
+                                <span class="text-[10px] font-bold text-slate-500 uppercase">Jml:</span>
+                                <input type="number" min="1" max="50" value="${qty}"
+                                    oninput="updateBookingAddonQty(${addon.id}, this.value)"
+                                    class="w-14 rounded-lg border border-indigo-300 bg-white px-2 py-1 text-xs font-bold text-center text-slate-900 focus:border-indigo-600 focus:outline-none">
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleBookingAddon(addonId, checked) {
+            if (checked) {
+                state.selectedAddons[addonId] = 1;
+            } else {
+                delete state.selectedAddons[addonId];
+            }
+            renderBookingAddonsList();
+            updatePricePreview();
+        }
+
+        function updateBookingAddonQty(addonId, val) {
+            const qty = Math.max(1, parseInt(val || '1', 10));
+            state.selectedAddons[addonId] = qty;
+            updatePricePreview();
+        }
+
+        function calculateSelectedAddonsTotal(durationMinutes, participants) {
+            const hours = Math.max(0, durationMinutes / 60);
+            let total = 0;
+            let count = 0;
+
+            Object.entries(state.selectedAddons).forEach(([idStr, qty]) => {
+                const addon = state.additionalFacilities.find(a => String(a.id) === String(idStr));
+                if (!addon) return;
+                count++;
+                const q = Math.max(1, Number(qty || 1));
+                if (addon.pricing_type === 'PER_HOUR') {
+                    total += Math.round(addon.price * hours * q);
+                } else if (addon.pricing_type === 'PER_PARTICIPANT') {
+                    total += Math.round(addon.price * Math.max(0, participants) * q);
+                } else {
+                    total += Math.round(addon.price * q);
+                }
+            });
+
+            const badge = document.getElementById('bf-addons-count-badge');
+            if (badge) {
+                badge.textContent = `${count} dipilih`;
+            }
+
+            return total;
+        }
+
         function renderRoomsCatalog() {
             const grid = document.getElementById('rooms-catalog-grid');
             if (!state.rooms.length) {
@@ -687,6 +910,8 @@
 
             const metaEl = document.getElementById('bf-room-meta');
             const durationEl = document.getElementById('bf-duration-label');
+            const roomPriceEl = document.getElementById('bf-room-price-preview');
+            const addonsPriceEl = document.getElementById('bf-addons-price-preview');
             const priceEl = document.getElementById('bf-price-preview');
             const hintEl = document.getElementById('bf-rule-hint');
 
@@ -695,7 +920,7 @@
                 return;
             }
 
-            metaEl.textContent = `Kapasitas: maks. ${room.capacity} orang • Fasilitas: ${(room.facilities || []).join(', ')}`;
+            metaEl.textContent = `Kapasitas: maks. ${room.capacity} orang • Fasilitas Bawaan: ${(room.facilities || []).join(', ')}`;
 
             const diffMinutes = timeToMinutes(end) - timeToMinutes(start);
             const hours = diffMinutes / 60;
@@ -703,6 +928,8 @@
             if (diffMinutes <= 0) {
                 durationEl.textContent = 'Jam selesai harus setelah jam mulai';
                 durationEl.className = 'font-bold text-rose-600';
+                if (roomPriceEl) roomPriceEl.textContent = 'Rp 0';
+                if (addonsPriceEl) addonsPriceEl.textContent = 'Rp 0';
                 priceEl.textContent = 'Rp 0';
                 hintEl.textContent = '⚠ Jam selesai harus lebih besar dari jam mulai.';
                 hintEl.className = 'text-[11px] text-rose-600 font-semibold';
@@ -725,8 +952,13 @@
                 hintEl.className = 'text-[11px] text-emerald-700 font-medium';
             }
 
-            const total = Math.round(hours * room.price_per_hour);
-            priceEl.textContent = formatRupiah(Math.max(0, total));
+            const roomTotal = Math.max(0, Math.round(hours * room.price_per_hour));
+            const addonsTotal = Math.max(0, calculateSelectedAddonsTotal(diffMinutes, participants));
+            const total = roomTotal + addonsTotal;
+
+            if (roomPriceEl) roomPriceEl.textContent = formatRupiah(roomTotal);
+            if (addonsPriceEl) addonsPriceEl.textContent = formatRupiah(addonsTotal);
+            priceEl.textContent = formatRupiah(total);
         }
 
         async function loadRoomAvailability() {
@@ -810,6 +1042,11 @@
 
         async function submitBooking(e) {
             e.preventDefault();
+            const additional_facilities = Object.entries(state.selectedAddons).map(([id, quantity]) => ({
+                id: Number(id),
+                quantity: Number(quantity),
+            }));
+
             const payload = {
                 room_id: Number(document.getElementById('bf-room').value),
                 date: document.getElementById('bf-date').value,
@@ -818,6 +1055,7 @@
                 participants: Number(document.getElementById('bf-participants').value),
                 booker_name: document.getElementById('bf-name').value,
                 booker_contact: document.getElementById('bf-contact').value,
+                additional_facilities,
             };
 
             try {
@@ -830,15 +1068,21 @@
 
                 if (res.status === 201) {
                     const b = json.data;
+                    const addonsSummary = (b.additional_facilities && b.additional_facilities.length)
+                        ? ` Fasilitas tambahan: ${b.additional_facilities.map(a => `${a.name} (x${a.quantity})`).join(', ')}.`
+                        : '';
                     showAlert(
                         'success',
-                        `Booking Berhasil Dikonfirmasi! (Kode Booking #${b.id})`,
-                        `Ruang berhasil dipesan atas nama ${b.booker_name} pada ${b.date} pukul ${b.start_hour}–${b.end_hour} WIB. Total biaya: ${formatRupiah(b.total_price)}.`,
+                        `Booking Berhasil Dibuat! (${b.booking_code || '#' + b.id})`,
+                        `Ruang berhasil dipesan atas nama ${b.booker_name} pada ${b.date} pukul ${b.start_hour}–${b.end_hour} WIB.${addonsSummary} Total tagihan QRIS: ${formatRupiah(b.total_price)}. Silakan selesaikan pembayaran QRIS pada jendela yang muncul.`,
                         201
                     );
                     document.getElementById('bf-name').value = '';
                     document.getElementById('bf-contact').value = '';
-                    refreshAllData();
+                    state.selectedAddons = {};
+                    renderBookingAddonsList();
+                    await refreshAllData();
+                    openQrisModal(b.id);
                 } else {
                     showAlert(
                         'error',
@@ -921,11 +1165,13 @@
 
         async function loadBookingsList() {
             const status = document.getElementById('bl-status-filter').value;
+            const paymentStatus = document.getElementById('bl-payment-filter')?.value || '';
             const roomId = document.getElementById('bl-room-filter').value;
             const search = document.getElementById('bl-search').value;
 
             const params = new URLSearchParams();
             if (status) params.set('status', status);
+            if (paymentStatus) params.set('payment_status', paymentStatus);
             if (roomId) params.set('room_id', roomId);
             if (search) params.set('booker_name', search);
 
@@ -942,11 +1188,26 @@
             tbody.innerHTML = state.bookings.map(b => {
                 const roomName = b.room ? b.room.name : `Ruang #${b.room_id}`;
                 const isConfirmed = b.status === 'CONFIRMED';
+                const isPaid = b.payment_status === 'PAID';
+                const addonsList = b.additional_facilities || [];
+                const addonsBadges = addonsList.length
+                    ? `<div class="flex flex-wrap gap-1 mt-1.5">${addonsList.map(a => `<span class="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/70 text-[10px] font-semibold">+ ${a.name} (x${a.quantity}) · ${formatRupiah(a.subtotal)}</span>`).join('')}</div>`
+                    : `<span class="text-[11px] text-slate-400 block mt-0.5">Tanpa fasilitas tambahan</span>`;
+
+                const paymentBadge = isPaid
+                    ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold mt-1">QRIS · LUNAS</span>`
+                    : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-extrabold mt-1">QRIS · BELUM BAYAR</span>`;
 
                 return `
                     <tr class="hover:bg-slate-50/80 transition">
-                        <td class="py-3.5 px-4 font-mono-code text-xs font-bold text-slate-500">#${b.id}</td>
-                        <td class="py-3.5 px-4 font-bold text-slate-900">${roomName}</td>
+                        <td class="py-3.5 px-4 font-mono-code text-xs">
+                            <span class="font-extrabold text-indigo-700 block">${b.booking_code || '#' + b.id}</span>
+                            <span class="text-[10px] text-slate-400">ID #${b.id}</span>
+                        </td>
+                        <td class="py-3.5 px-4">
+                            <span class="font-bold text-slate-900 block">${roomName}</span>
+                            ${addonsBadges}
+                        </td>
                         <td class="py-3.5 px-4">
                             <p class="font-bold text-slate-900">${b.booker_name}</p>
                             <p class="text-xs text-slate-500">${b.booker_contact}</p>
@@ -956,24 +1217,212 @@
                             <span class="text-indigo-600 font-semibold">${b.start_hour} – ${b.end_hour} WIB (${b.duration_hours} jam)</span>
                         </td>
                         <td class="py-3.5 px-4 text-xs font-semibold text-slate-700">${b.participants} orang</td>
-                        <td class="py-3.5 px-4 font-mono-code text-xs font-bold text-slate-900">${formatRupiah(b.total_price)}</td>
+                        <td class="py-3.5 px-4 font-mono-code text-xs">
+                            <span class="font-bold text-slate-900 block">${formatRupiah(b.total_price)}</span>
+                            ${b.additional_facilities_price > 0 ? `<span class="text-[10px] text-slate-500 block">Ruang: ${formatRupiah(b.room_price)} + Add-on: ${formatRupiah(b.additional_facilities_price)}</span>` : ''}
+                            ${paymentBadge}
+                        </td>
                         <td class="py-3.5 px-4">
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${isConfirmed ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}">
                                 ${b.status}
                             </span>
                             ${b.penalty_amount > 0 ? `<p class="text-[11px] font-mono-code font-bold text-amber-700 mt-1">Denda 50%: ${formatRupiah(b.penalty_amount)}</p>` : (b.status === 'CANCELLED' ? `<p class="text-[11px] text-slate-500 mt-1">Bebas Denda (Rp 0)</p>` : '')}
                         </td>
-                        <td class="py-3.5 px-4 text-right">
+                        <td class="py-3.5 px-4 text-right space-y-1.5">
+                            <button onclick="openQrisModal(${b.id})"
+                                class="w-full px-3 py-1.5 rounded-xl ${isPaid ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs'} text-xs font-bold transition cursor-pointer">
+                                ${isPaid ? 'Lihat Bukti QRIS' : 'Bayar QRIS'}
+                            </button>
                             ${isConfirmed ? `
                                 <button onclick="cancelBooking(${b.id})"
-                                    class="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 text-xs font-bold transition cursor-pointer">
+                                    class="w-full px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 text-xs font-bold transition cursor-pointer">
                                     Batalkan Pesanan
                                 </button>
-                            ` : `<span class="text-xs text-slate-400">Dibatalkan</span>`}
+                            ` : `<span class="block text-center text-xs text-slate-400">Dibatalkan</span>`}
                         </td>
                     </tr>
                 `;
             }).join('');
+        }
+
+        let currentQrisBookingId = null;
+
+        function generateQrisSvg(payloadStr) {
+            const size = 25;
+            const matrix = Array.from({ length: size }, () => Array(size).fill(0));
+            const reserved = Array.from({ length: size }, () => Array(size).fill(false));
+
+            function drawFinder(r0, c0) {
+                for (let r = -1; r <= 7; r++) {
+                    for (let c = -1; c <= 7; c++) {
+                        const rr = r0 + r, cc = c0 + c;
+                        if (rr >= 0 && rr < size && cc >= 0 && cc < size) {
+                            reserved[rr][cc] = true;
+                            if (r >= 0 && r <= 6 && c >= 0 && c <= 6) {
+                                if (r === 0 || r === 6 || c === 0 || c === 6 || (r >= 2 && r <= 4 && c >= 2 && c <= 4)) {
+                                    matrix[rr][cc] = 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            drawFinder(0, 0);
+            drawFinder(0, size - 7);
+            drawFinder(size - 7, 0);
+
+            // Alignment pattern at bottom-right
+            const ar = size - 9, ac = size - 9;
+            for (let r = -2; r <= 2; r++) {
+                for (let c = -2; c <= 2; c++) {
+                    reserved[ar + r][ac + c] = true;
+                    if (Math.abs(r) === 2 || Math.abs(c) === 2 || (r === 0 && c === 0)) {
+                        matrix[ar + r][ac + c] = 1;
+                    }
+                }
+            }
+
+            // Timing patterns
+            for (let i = 8; i < size - 8; i++) {
+                reserved[6][i] = true;
+                reserved[i][6] = true;
+                matrix[6][i] = i % 2 === 0 ? 1 : 0;
+                matrix[i][6] = i % 2 === 0 ? 1 : 0;
+            }
+
+            // Deterministic hash fill from QRIS EMVCo payload
+            let hash = 2166136261;
+            const str = String(payloadStr || 'RUANGKITA-QRIS');
+            for (let i = 0; i < str.length; i++) {
+                hash ^= str.charCodeAt(i);
+                hash = Math.imul(hash, 16777619);
+            }
+
+            let idx = 0;
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    if (!reserved[r][c]) {
+                        const charCode = str.charCodeAt(idx % str.length);
+                        const bit = ((hash >>> (idx % 24)) ^ charCode ^ (r * 31 + c * 17)) & 1;
+                        matrix[r][c] = bit;
+                        idx++;
+                    }
+                }
+            }
+
+            let rects = '';
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    if (matrix[r][c]) {
+                        rects += `<rect x="${c}" y="${r}" width="1" height="1" fill="#0f172a"/>`;
+                    }
+                }
+            }
+
+            // Center QRIS badge inside SVG
+            return `
+                <svg viewBox="0 0 ${size} ${size}" class="w-full h-full" shape-rendering="crispEdges">
+                    <rect width="${size}" height="${size}" fill="#ffffff"/>
+                    ${rects}
+                    <rect x="9.5" y="10.5" width="6" height="4" rx="0.6" fill="#e11d48" stroke="#ffffff" stroke-width="0.5"/>
+                    <text x="12.5" y="13.2" text-anchor="middle" fill="#ffffff" font-size="2.1" font-weight="bold" font-family="monospace">QRIS</text>
+                </svg>
+            `;
+        }
+
+        async function openQrisModal(bookingId) {
+            currentQrisBookingId = bookingId;
+            try {
+                const res = await fetch(`/api/bookings/${bookingId}/qris`);
+                const json = await res.json();
+                if (!res.ok || !json.data) {
+                    showAlert('error', 'Gagal Memuat QRIS', json.message || 'Tidak dapat memuat detail pembayaran QRIS.');
+                    return;
+                }
+
+                const q = json.data;
+                const b = q.booking;
+                const isPaid = q.payment_status === 'PAID';
+                const isCancelled = b.status === 'CANCELLED';
+
+                document.getElementById('qm-booking-code').textContent = `${q.booking_code} (#${q.booking_id})`;
+                document.getElementById('qm-total-amount').textContent = formatRupiah(q.total_price);
+                document.getElementById('qm-reference').textContent = `Ref: ${q.payment_reference} • Metode: QRIS`;
+                document.getElementById('qm-qr-container').innerHTML = generateQrisSvg(q.qris_payload);
+
+                document.getElementById('qm-room-info').textContent = `${b.room ? b.room.name : 'Ruang #' + b.room_id} (${b.participants} peserta)`;
+                document.getElementById('qm-schedule-info').textContent = `${b.date} • ${b.start_hour}–${b.end_hour} WIB (${b.duration_hours} jam)`;
+                document.getElementById('qm-booker-info').textContent = `${b.booker_name} (${b.booker_contact})`;
+                document.getElementById('qm-room-price').textContent = formatRupiah(q.room_price);
+
+                const addonsContainer = document.getElementById('qm-addons-breakdown');
+                if (b.additional_facilities && b.additional_facilities.length) {
+                    addonsContainer.innerHTML = b.additional_facilities.map(a => `
+                        <div class="flex justify-between text-indigo-700">
+                            <span>+ ${a.name} (x${a.quantity})</span>
+                            <span class="font-mono-code font-semibold">${formatRupiah(a.subtotal)}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    addonsContainer.innerHTML = '';
+                }
+
+                const statusBadge = document.getElementById('qm-status-badge');
+                const paidBanner = document.getElementById('qm-paid-banner');
+                const payBtn = document.getElementById('qm-pay-btn');
+
+                if (isPaid) {
+                    statusBadge.textContent = 'QRIS LUNAS (PAID)';
+                    statusBadge.className = 'px-2 py-0.5 rounded-md bg-emerald-400 text-slate-950 text-[10px] font-extrabold uppercase';
+                    paidBanner.classList.remove('hidden');
+                    payBtn.classList.add('hidden');
+                } else if (isCancelled) {
+                    statusBadge.textContent = 'DIBATALKAN';
+                    statusBadge.className = 'px-2 py-0.5 rounded-md bg-rose-400 text-white text-[10px] font-extrabold uppercase';
+                    paidBanner.classList.add('hidden');
+                    payBtn.classList.add('hidden');
+                } else {
+                    statusBadge.textContent = 'MENUNGGU PEMBAYARAN';
+                    statusBadge.className = 'px-2 py-0.5 rounded-md bg-amber-400 text-slate-950 text-[10px] font-extrabold uppercase';
+                    paidBanner.classList.add('hidden');
+                    payBtn.classList.remove('hidden');
+                }
+
+                document.getElementById('qris-modal').classList.remove('hidden');
+            } catch (e) {
+                showAlert('error', 'Kesalahan Jaringan', e.message);
+            }
+        }
+
+        function closeQrisModal() {
+            document.getElementById('qris-modal').classList.add('hidden');
+        }
+
+        async function confirmQrisPaymentFromModal() {
+            if (!currentQrisBookingId) return;
+            try {
+                const res = await fetch(`/api/bookings/${currentQrisBookingId}/pay`, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json' },
+                });
+                const json = await res.json();
+                if (res.ok) {
+                    const b = json.data;
+                    showAlert(
+                        'success',
+                        `Pembayaran QRIS Berhasil! (${b.booking_code})`,
+                        `Pembayaran sejumlah ${formatRupiah(b.total_price)} telah diterima melalui QRIS (Ref: ${b.payment_reference}). Status pembayaran kini LUNAS (PAID).`,
+                        200
+                    );
+                    await refreshAllData();
+                    await openQrisModal(currentQrisBookingId);
+                } else {
+                    showAlert('error', 'Gagal Memproses Pembayaran QRIS', json.message || 'Terjadi kesalahan.', res.status);
+                }
+            } catch (e) {
+                showAlert('error', 'Kesalahan Jaringan', e.message);
+            }
         }
 
         async function cancelBooking(bookingId) {
@@ -1011,6 +1460,7 @@
             await Promise.all([
                 checkHealth(),
                 loadRooms(),
+                loadAdditionalFacilities(),
                 loadBookingsList(),
             ]);
             if (!document.getElementById('tab-calendar').classList.contains('hidden')) {

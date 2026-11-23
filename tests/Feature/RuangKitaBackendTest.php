@@ -605,4 +605,143 @@ class RuangKitaBackendTest extends TestCase
         $this->post('/admin/logout')->assertRedirect('/admin/login');
         $this->get('/admin')->assertRedirect('/admin/login');
     }
+
+    /**
+     * T-15: CRUD Additional Facilities & Booking with flexible pricing (PER_BOOKING, PER_HOUR, PER_PARTICIPANT).
+     */
+    public function test_t15_additional_facilities_crud_and_booking_price_calculation(): void
+    {
+        $room = Room::factory()->create([
+            'name' => 'Ruang Nusantara',
+            'capacity' => 10,
+            'price_per_hour' => 200000,
+        ]);
+
+        // 1. Create 3 additional facilities with different pricing schemes
+        $flatResp = $this->postJson('/api/additional-facilities', [
+            'name' => 'Kamera 360 Conference',
+            'description' => 'Kamera hybrid meeting',
+            'price' => 100000,
+            'pricing_type' => 'PER_BOOKING',
+            'is_active' => true,
+        ])->assertStatus(201);
+        $flatId = $flatResp->json('data.id');
+
+        $hourlyResp = $this->postJson('/api/additional-facilities', [
+            'name' => 'Proyektor Ekstra',
+            'price' => 50000,
+            'pricing_type' => 'PER_HOUR',
+            'is_active' => true,
+        ])->assertStatus(201);
+        $hourlyId = $hourlyResp->json('data.id');
+
+        $perPersonResp = $this->postJson('/api/additional-facilities', [
+            'name' => 'Paket Coffee Break',
+            'price' => 30000,
+            'pricing_type' => 'PER_PARTICIPANT',
+            'is_active' => true,
+        ])->assertStatus(201);
+        $perPersonId = $perPersonResp->json('data.id');
+
+        // 2. Book room for 2 hours (09:00 - 11:00) with 6 participants and all 3 add-ons
+        // Room price = 2 * 200,000 = 400,000
+        // Flat add-on (qty 1) = 100,000
+        // Hourly add-on (qty 2, 2 hours) = 50,000 * 2 * 2 = 200,000
+        // Per participant add-on (qty 1, 6 participants) = 30,000 * 6 * 1 = 180,000
+        // Add-ons total = 480,000 -> Grand Total = 880,000
+        $bookingResp = $this->postJson('/api/bookings', [
+            'room_id' => $room->id,
+            'booker_name' => 'Rina Permata',
+            'booker_contact' => '08123456789',
+            'date' => '2026-11-26',
+            'start_time' => '09:00',
+            'end_time' => '11:00',
+            'participants' => 6,
+            'additional_facilities' => [
+                ['id' => $flatId, 'quantity' => 1],
+                ['id' => $hourlyId, 'quantity' => 2],
+                ['id' => $perPersonId, 'quantity' => 1],
+            ],
+        ]);
+
+        $bookingResp->assertStatus(201)
+            ->assertJsonPath('data.room_price', 400000)
+            ->assertJsonPath('data.additional_facilities_price', 480000)
+            ->assertJsonPath('data.total_price', 880000)
+            ->assertJsonCount(3, 'data.additional_facilities');
+
+        // 3. Attempting to delete an additional facility used in an upcoming booking deactivates it instead
+        $this->deleteJson("/api/additional-facilities/{$flatId}")
+            ->assertStatus(200)
+            ->assertJsonPath('action', 'deactivated')
+            ->assertJsonPath('data.is_active', false);
+
+        // 4. Inactive additional facility cannot be selected for new booking
+        $this->postJson('/api/bookings', [
+            'room_id' => $room->id,
+            'booker_name' => 'Doni',
+            'booker_contact' => '08198765432',
+            'date' => '2026-11-27',
+            'start_time' => '09:00',
+            'end_time' => '11:00',
+            'participants' => 4,
+            'additional_facilities' => [
+                ['id' => $flatId, 'quantity' => 1],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonPath('error', 'ADDITIONAL_FACILITY_INACTIVE');
+    }
+
+    /**
+     * T-16: QRIS-Only Payment Gateway generation, payload inspection, and settlement verification.
+     */
+    public function test_t16_qris_payment_gateway_generation_and_settlement(): void
+    {
+        $room = Room::factory()->create([
+            'name' => 'Ruang Garuda',
+            'capacity' => 8,
+            'price_per_hour' => 150000,
+        ]);
+
+        // 1. Create booking -> automatically generates QRIS payload & UNPAID payment status
+        $createResp = $this->postJson('/api/bookings', [
+            'room_id' => $room->id,
+            'booker_name' => 'Farhan Akbar',
+            'booker_contact' => '08129876543',
+            'date' => '2026-11-26',
+            'start_time' => '13:00',
+            'end_time' => '15:00',
+            'participants' => 6,
+        ])->assertStatus(201)
+            ->assertJsonPath('data.payment_method', 'QRIS')
+            ->assertJsonPath('data.payment_status', 'UNPAID')
+            ->assertJsonPath('data.total_price', 300000);
+
+        $bookingId = $createResp->json('data.id');
+        $bookingCode = $createResp->json('data.booking_code');
+        $this->assertNotEmpty($bookingCode);
+        $this->assertStringStartsWith('RK-20261126-', $bookingCode);
+
+        // 2. Inspect QRIS Payment Gateway endpoint
+        $qrisResp = $this->getJson("/api/bookings/{$bookingId}/qris")
+            ->assertStatus(200)
+            ->assertJsonPath('data.booking_id', $bookingId)
+            ->assertJsonPath('data.booking_code', $bookingCode)
+            ->assertJsonPath('data.payment_method', 'QRIS')
+            ->assertJsonPath('data.payment_status', 'UNPAID')
+            ->assertJsonPath('data.total_price', 300000);
+
+        $this->assertStringContainsString('ID.CO.QRIS.WWW', $qrisResp->json('data.qris_payload'));
+        $this->assertStringContainsString('RUANGKITA', $qrisResp->json('data.qris_payload'));
+
+        // 3. Settle/pay via QRIS endpoint
+        $this->postJson("/api/bookings/{$bookingId}/pay")
+            ->assertStatus(200)
+            ->assertJsonPath('data.payment_status', 'PAID');
+
+        // 4. Paying an already PAID booking is rejected with 422
+        $this->postJson("/api/bookings/{$bookingId}/pay")
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'PAYMENT_ALREADY_PAID');
+    }
 }
