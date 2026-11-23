@@ -20,10 +20,22 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        User::firstOrCreate(
+        User::updateOrCreate(
             ['email' => 'admin@ruangkita.id'],
             [
                 'name' => 'Admin RuangKita',
+                'phone' => '081100001111',
+                'role' => 'admin',
+                'password' => bcrypt('password'),
+            ]
+        );
+
+        $customerBudi = User::updateOrCreate(
+            ['email' => 'budi@ruangkita.id'],
+            [
+                'name' => 'Budi Santoso',
+                'phone' => '081234567890',
+                'role' => 'customer',
                 'password' => bcrypt('password'),
             ]
         );
@@ -139,6 +151,7 @@ class DatabaseSeeder extends Seeder
             $b1Code = 'RK-' . $tomorrowWib->format('Ymd') . '-B101';
             $b1 = Booking::create([
                 'booking_code' => $b1Code,
+                'user_id' => $customerBudi->id,
                 'room_id' => $nusantara->id,
                 'booker_name' => 'Budi Santoso',
                 'booker_contact' => '081234567890',

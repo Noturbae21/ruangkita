@@ -84,8 +84,14 @@
             </form>
 
             <!-- Demo Credential Helper Box -->
-            <div class="p-4 rounded-2xl bg-slate-800/70 border border-slate-700/80 text-xs text-slate-300 space-y-1.5">
-                <p class="font-bold text-indigo-300">Akun Demo Seeder (FR-14):</p>
+            <div class="p-4 rounded-2xl bg-slate-800/70 border border-slate-700/80 text-xs text-slate-300 space-y-2">
+                <div class="flex items-center justify-between">
+                    <p class="font-bold text-indigo-300">Akun Demo Seeder (FR-14):</p>
+                    <button type="button" onclick="document.querySelector('input[name=email]').value='admin@ruangkita.id'; document.querySelector('input[name=password]').value='password';"
+                        class="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-400/30 text-indigo-200 text-[11px] font-bold transition cursor-pointer">
+                        Isi Otomatis
+                    </button>
+                </div>
                 <div class="flex items-center justify-between font-mono-code text-[11px]">
                     <span>Email: <strong class="text-white">admin@ruangkita.id</strong></span>
                     <span>Password: <strong class="text-white">password</strong></span>

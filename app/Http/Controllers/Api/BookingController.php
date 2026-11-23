@@ -26,6 +26,22 @@ class BookingController extends Controller
             $query->where('room_id', (int) $request->query('room_id'));
         }
 
+        if ($request->filled('user_id')) {
+            $userId = (int) $request->query('user_id');
+            $customerContact = $request->query('customer_contact');
+            $hasUserIdCol = \Illuminate\Support\Facades\Schema::hasColumn('bookings', 'user_id');
+            $query->where(function ($q) use ($userId, $customerContact, $hasUserIdCol) {
+                if ($hasUserIdCol) {
+                    $q->where('user_id', $userId);
+                    if ($customerContact) {
+                        $q->orWhere('booker_contact', $customerContact);
+                    }
+                } elseif ($customerContact) {
+                    $q->where('booker_contact', $customerContact);
+                }
+            });
+        }
+
         if ($request->filled('status')) {
             $query->where('status', strtoupper((string) $request->query('status')));
         }
@@ -68,7 +84,11 @@ class BookingController extends Controller
     public function store(Request $request): JsonResponse
     {
         $nowUtc = Clock::now($request);
-        $booking = $this->bookingService->createBooking($request->all(), $nowUtc);
+        $payload = $request->all();
+        if (empty($payload['user_id']) && $request->hasSession() && $request->session()->has('customer_id')) {
+            $payload['user_id'] = (int) $request->session()->get('customer_id');
+        }
+        $booking = $this->bookingService->createBooking($payload, $nowUtc);
 
         return response()->json([
             'message' => 'Booking berhasil dibuat.',

@@ -23,6 +23,7 @@ class Booking extends Model
 
     protected $fillable = [
         'booking_code',
+        'user_id',
         'room_id',
         'booker_name',
         'booker_contact',
@@ -46,6 +47,7 @@ class Booking extends Model
     protected function casts(): array
     {
         return [
+            'user_id' => 'integer',
             'room_id' => 'integer',
             'start_time' => 'datetime',
             'end_time' => 'datetime',
@@ -106,6 +108,7 @@ class Booking extends Model
         $data = [
             'id' => $this->id,
             'booking_code' => $bookingCode,
+            'user_id' => $this->user_id,
             'room_id' => $this->room_id,
             'booker_name' => $this->booker_name,
             'booker_contact' => $this->booker_contact,

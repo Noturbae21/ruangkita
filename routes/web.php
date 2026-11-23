@@ -1,13 +1,24 @@
 <?php
 
 use App\Http\Controllers\AdminAuthController;
+use App\Http\Controllers\CustomerAuthController;
 use App\Http\Controllers\HealthController;
 use Illuminate\Support\Facades\Route;
 
-// Portal Pengguna / Pemesan
+// Landing Page Utama (/)
 Route::get('/', function () {
-    return view('welcome');
+    return view('landing');
 })->name('home');
+
+// Halaman Sewa / Portal Pemesanan (/sewa) — Wajib Login Penyewa Terlebih Dahulu
+Route::get('/sewa', [CustomerAuthController::class, 'bookingPortal'])->name('booking.portal');
+
+// Autentikasi Penyewa / Customer (Login & Register)
+Route::get('/login', [CustomerAuthController::class, 'showLogin'])->name('customer.login');
+Route::post('/login', [CustomerAuthController::class, 'login'])->name('customer.login.submit');
+Route::get('/register', [CustomerAuthController::class, 'showRegister'])->name('customer.register');
+Route::post('/register', [CustomerAuthController::class, 'register'])->name('customer.register.submit');
+Route::post('/logout', [CustomerAuthController::class, 'logout'])->name('customer.logout');
 
 // Portal Admin Coworking
 Route::get('/admin/login', [AdminAuthController::class, 'showLogin'])->name('admin.login');
