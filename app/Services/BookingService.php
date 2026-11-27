@@ -322,6 +322,92 @@ class BookingService
     }
 
     /**
+     * Reschedule an existing CONFIRMED booking to a new date/time with the same duration.
+     */
+    public function rescheduleBooking(int $bookingId, array $payload, ?Carbon $nowUtc = null): Booking
+    {
+        $nowUtc = ($nowUtc ?? Clock::now())->copy()->utc();
+
+        foreach (['start_time', 'end_time'] as $field) {
+            if (! array_key_exists($field, $payload) || $payload[$field] === null || trim((string) $payload[$field]) === '') {
+                throw new DomainException("Field '{$field}' wajib diisi untuk ubah jadwal.", 400, 'INVALID_INPUT');
+            }
+        }
+
+        [$newStartUtc, $newEndUtc, $newStartWib, $newEndWib] = $this->parseBookingTimes($payload);
+
+        return DB::transaction(function () use ($bookingId, $newStartUtc, $newEndUtc, $newStartWib, $newEndWib, $nowUtc) {
+            $booking = Booking::with(['room', 'additionalFacilities'])->where('id', $bookingId)->lockForUpdate()->first();
+
+            if (! $booking) {
+                throw new DomainException('Booking tidak ditemukan.', 404, 'BOOKING_NOT_FOUND');
+            }
+
+            if ($booking->status === Booking::STATUS_CANCELLED) {
+                throw new DomainException(
+                    'Booking yang sudah dibatalkan tidak dapat diubah jadwalnya.',
+                    422,
+                    'RESCHEDULE_ALREADY_CANCELLED'
+                );
+            }
+
+            $oldStartUtc = Carbon::parse($booking->getRawOriginal('start_time') ?? $booking->start_time, 'UTC')->utc();
+            $oldEndUtc = Carbon::parse($booking->getRawOriginal('end_time') ?? $booking->end_time, 'UTC')->utc();
+
+            if ($nowUtc->greaterThanOrEqualTo($oldStartUtc)) {
+                throw new DomainException(
+                    'Booking yang sudah dimulai atau selesai tidak dapat diubah jadwalnya.',
+                    422,
+                    'RESCHEDULE_ALREADY_STARTED'
+                );
+            }
+
+            $lockedRoom = Room::where('id', $booking->room_id)->lockForUpdate()->first();
+            if (! $lockedRoom) {
+                throw new DomainException('Ruang tidak ditemukan.', 404, 'ROOM_NOT_FOUND');
+            }
+
+            $this->validateBusinessRules($lockedRoom, $newStartUtc, $newEndUtc, $newStartWib, $newEndWib, (int) $booking->participants, $nowUtc);
+
+            $oldDurationMinutes = $oldStartUtc->diffInMinutes($oldEndUtc);
+            $newDurationMinutes = $newStartUtc->diffInMinutes($newEndUtc);
+
+            if ($newDurationMinutes !== $oldDurationMinutes) {
+                $oldHours = $oldDurationMinutes / 60;
+                throw new DomainException(
+                    "Durasi jadwal baru harus sama dengan durasi pesanan awal ({$oldHours} jam / {$oldDurationMinutes} menit) agar total tagihan tetap sesuai.",
+                    422,
+                    'RESCHEDULE_DURATION_MISMATCH'
+                );
+            }
+
+            // BR-01: Check conflict against other CONFIRMED bookings in the same room (excluding this booking itself)
+            $hasConflict = Booking::where('room_id', $lockedRoom->id)
+                ->where('id', '!=', $booking->id)
+                ->where('status', Booking::STATUS_CONFIRMED)
+                ->where('start_time', '<', $newEndUtc->format('Y-m-d H:i:s'))
+                ->where('end_time', '>', $newStartUtc->format('Y-m-d H:i:s'))
+                ->lockForUpdate()
+                ->exists();
+
+            if ($hasConflict) {
+                throw new DomainException(
+                    'Jadwal baru bentrok dengan booking lain pada ruang yang sama. Silakan pilih jam lain yang kosong.',
+                    409,
+                    'BR_01_BOOKING_CONFLICT'
+                );
+            }
+
+            $booking->update([
+                'start_time' => $newStartUtc->format('Y-m-d H:i:s'),
+                'end_time' => $newEndUtc->format('Y-m-d H:i:s'),
+            ]);
+
+            return $booking->fresh(['room', 'additionalFacilities']);
+        });
+    }
+
+    /**
      * Cancel an existing booking enforcing FR-09, BR-05, and BR-06.
      */
     public function cancelBooking(int $bookingId, ?Carbon $nowUtc = null): Booking
