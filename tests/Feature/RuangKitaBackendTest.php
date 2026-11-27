@@ -777,4 +777,66 @@ class RuangKitaBackendTest extends TestCase
             ->assertJsonPath('data.dimensions_label', '10m × 7m')
             ->assertJsonPath('data.layout_type', 'CLASSROOM');
     }
+
+    /**
+     * T-18: Rescheduling a booking updates date/time while preserving duration, price, and preventing conflicts.
+     */
+    public function test_t18_reschedule_booking_validates_duration_and_conflicts(): void
+    {
+        $room = Room::factory()->create([
+            'name' => 'Ruang Nusantara',
+            'capacity' => 12,
+            'price_per_hour' => 200000,
+        ]);
+
+        // 1. Create booking 1: 2026-11-26 09:00 - 11:00 (2 hours)
+        $b1Resp = $this->postJson('/api/bookings', [
+            'room_id' => $room->id,
+            'booker_name' => 'Syaidan',
+            'booker_contact' => '081234567880',
+            'date' => '2026-11-26',
+            'start_time' => '09:00',
+            'end_time' => '11:00',
+            'participants' => 4,
+        ])->assertStatus(201);
+        $b1Id = $b1Resp->json('data.id');
+
+        // 2. Create booking 2 on the same day: 14:00 - 16:00
+        $this->postJson('/api/bookings', [
+            'room_id' => $room->id,
+            'booker_name' => 'Pemesan Lain',
+            'booker_contact' => '0819999999',
+            'date' => '2026-11-26',
+            'start_time' => '14:00',
+            'end_time' => '16:00',
+            'participants' => 4,
+        ])->assertStatus(201);
+
+        // 3. Rescheduling b1 to a different duration (e.g. 3 hours) is rejected with 422
+        $this->postJson("/api/bookings/{$b1Id}/reschedule", [
+            'date' => '2026-11-26',
+            'start_time' => '10:00',
+            'end_time' => '13:00',
+        ])->assertStatus(422)
+            ->assertJsonPath('error', 'RESCHEDULE_DURATION_MISMATCH');
+
+        // 4. Rescheduling b1 into b2's slot (14:00 - 16:00) is rejected with 409
+        $this->postJson("/api/bookings/{$b1Id}/reschedule", [
+            'date' => '2026-11-26',
+            'start_time' => '13:00',
+            'end_time' => '15:00',
+        ])->assertStatus(409)
+            ->assertJsonPath('error', 'BR_01_BOOKING_CONFLICT');
+
+        // 5. Rescheduling b1 to an overlapping shift with its own previous time (10:00 - 12:00) succeeds (200)
+        $this->postJson("/api/bookings/{$b1Id}/reschedule", [
+            'date' => '2026-11-26',
+            'start_time' => '10:00',
+            'end_time' => '12:00',
+        ])->assertStatus(200)
+            ->assertJsonPath('data.date', '2026-11-26')
+            ->assertJsonPath('data.start_hour', '10:00')
+            ->assertJsonPath('data.end_hour', '12:00')
+            ->assertJsonPath('data.total_price', 400000);
+    }
 }

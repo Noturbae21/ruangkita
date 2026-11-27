@@ -169,6 +169,20 @@ class BookingController extends Controller
     }
 
     /**
+     * Reschedule an existing CONFIRMED booking to a new date/time.
+     */
+    public function reschedule(Request $request, int $id): JsonResponse
+    {
+        $nowUtc = Clock::now($request);
+        $booking = $this->bookingService->rescheduleBooking($id, $request->all(), $nowUtc);
+
+        return response()->json([
+            'message' => 'Jadwal booking berhasil diubah (reschedule).',
+            'data' => $booking->toApiArray(),
+        ], 200);
+    }
+
+    /**
      * FR-09 & BR-05: Cancel a booking and calculate penalty.
      */
     public function cancel(Request $request, int $id): JsonResponse

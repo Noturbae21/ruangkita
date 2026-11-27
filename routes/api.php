@@ -29,6 +29,7 @@ Route::get('/bookings', [BookingController::class, 'index']);
 Route::get('/bookings/{id}', [BookingController::class, 'show'])->whereNumber('id');
 Route::get('/bookings/{id}/qris', [BookingController::class, 'qris'])->whereNumber('id');
 Route::post('/bookings/{id}/pay', [BookingController::class, 'pay'])->whereNumber('id');
+Route::post('/bookings/{id}/reschedule', [BookingController::class, 'reschedule'])->whereNumber('id');
 Route::post('/bookings/{id}/cancel', [BookingController::class, 'cancel'])->whereNumber('id');
 
 Route::get('/calendar', [CalendarController::class, 'index']);
