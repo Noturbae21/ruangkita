@@ -589,8 +589,8 @@ class RuangKitaBackendTest extends TestCase
      */
     public function test_admin_portal_requires_login_and_allows_authenticated_admin(): void
     {
-        // Guest visiting /admin is redirected to /admin/login
-        $this->get('/admin')->assertRedirect('/admin/login');
+        // Guest visiting /admin is redirected to unified /login
+        $this->get('/admin')->assertRedirect('/login');
 
         // Login with valid admin credentials
         $this->post('/admin/login', [
@@ -601,9 +601,9 @@ class RuangKitaBackendTest extends TestCase
         // Authenticated admin can access /admin dashboard
         $this->get('/admin')->assertStatus(200);
 
-        // Logout redirects back to /admin/login
-        $this->post('/admin/logout')->assertRedirect('/admin/login');
-        $this->get('/admin')->assertRedirect('/admin/login');
+        // Logout redirects back to landing page (/)
+        $this->post('/admin/logout')->assertRedirect('/');
+        $this->get('/admin')->assertRedirect('/login');
     }
 
     /**

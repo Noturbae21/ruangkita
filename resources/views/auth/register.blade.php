@@ -55,9 +55,6 @@
                     Registrasi Penyewa Baru
                 </span>
                 <h1 class="text-2xl font-extrabold text-slate-900">Buat Akun RuangKita</h1>
-                <p class="text-xs text-slate-500 leading-relaxed">
-                    Daftar gratis dalam 30 detik untuk memesan ruang meeting lebih cepat dan mengelola seluruh riwayat reservasi tim Anda.
-                </p>
             </div>
 
             @if ($errors->any())
@@ -80,7 +77,7 @@
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Alamat Email</label>
                     <input type="email" name="email" value="{{ old('email') }}" required
-                        placeholder="rina@perusahaan.com"
+                        placeholder="Masukkan alamat email"
                         class="w-full rounded-xl border border-slate-300 bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-900 focus:border-indigo-600 focus:bg-white focus:outline-none">
                 </div>
 
@@ -91,19 +88,43 @@
                         class="w-full rounded-xl border border-slate-300 bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-900 focus:border-indigo-600 focus:bg-white focus:outline-none">
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Password</label>
-                        <input type="password" name="password" required
-                            placeholder="Min. 6 karakter"
-                            class="w-full rounded-xl border border-slate-300 bg-slate-50/50 px-3.5 py-2.5 text-sm font-medium text-slate-900 focus:border-indigo-600 focus:bg-white focus:outline-none">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Password</label>
+                    <div class="relative">
+                        <input type="password" id="reg-password" name="password" required
+                            placeholder="Minimal 6 karakter"
+                            class="w-full rounded-xl border border-slate-300 bg-slate-50/50 pl-4 pr-11 py-2.5 text-sm font-medium text-slate-900 focus:border-indigo-600 focus:bg-white focus:outline-none">
+                        <button type="button" onclick="togglePassword('reg-password', this)"
+                            class="absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                            aria-label="Tampilkan atau sembunyikan password">
+                            <svg class="w-5 h-5 icon-eye" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <svg class="w-5 h-5 icon-eye-off hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                            </svg>
+                        </button>
                     </div>
+                </div>
 
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Ulangi Password</label>
-                        <input type="password" name="password_confirmation" required
-                            placeholder="Ketik ulang"
-                            class="w-full rounded-xl border border-slate-300 bg-slate-50/50 px-3.5 py-2.5 text-sm font-medium text-slate-900 focus:border-indigo-600 focus:bg-white focus:outline-none">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Konfirmasi Password</label>
+                    <div class="relative">
+                        <input type="password" id="reg-password-confirm" name="password_confirmation" required
+                            placeholder="Masukkan konfirmasi password"
+                            class="w-full rounded-xl border border-slate-300 bg-slate-50/50 pl-4 pr-11 py-2.5 text-sm font-medium text-slate-900 focus:border-indigo-600 focus:bg-white focus:outline-none">
+                        <button type="button" onclick="togglePassword('reg-password-confirm', this)"
+                            class="absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                            aria-label="Tampilkan atau sembunyikan konfirmasi password">
+                            <svg class="w-5 h-5 icon-eye" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <svg class="w-5 h-5 icon-eye-off hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
 
@@ -123,5 +144,22 @@
     <footer class="text-center py-5 text-xs text-slate-400">
         RuangKita Coworking Space • Sistem Pemesanan Ruang Rapat
     </footer>
+
+    <script>
+        function togglePassword(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const eye = btn.querySelector('.icon-eye');
+            const eyeOff = btn.querySelector('.icon-eye-off');
+            if (input.type === 'password') {
+                input.type = 'text';
+                eye.classList.add('hidden');
+                eyeOff.classList.remove('hidden');
+            } else {
+                input.type = 'password';
+                eye.classList.remove('hidden');
+                eyeOff.classList.add('hidden');
+            }
+        }
+    </script>
 </body>
 </html>

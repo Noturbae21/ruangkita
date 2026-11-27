@@ -138,8 +138,8 @@ class BookingController extends Controller
             'data' => [
                 'booking_id' => $booking->id,
                 'booking_code' => $apiData['booking_code'],
-                'merchant_name' => 'RUANGKITA COWORKING SPACE',
-                'nmid' => 'ID1026000914300',
+                'merchant_name' => 'DAVIS, SOFTWARE',
+                'nmid' => 'ID1026496073473',
                 'payment_method' => Booking::PAYMENT_METHOD_QRIS,
                 'payment_status' => $apiData['payment_status'],
                 'payment_reference' => $apiData['payment_reference'] ?: ('QRIS-RK-' . $booking->id),
