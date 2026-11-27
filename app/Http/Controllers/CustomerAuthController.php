@@ -23,7 +23,37 @@ class CustomerAuthController extends Controller
                 ->with('auth_notice', 'Silakan masuk atau daftar akun penyewa terlebih dahulu untuk mulai menyewa ruang meeting.');
         }
 
-        return view('welcome');
+        return view('customer.booking');
+    }
+
+    /**
+     * Show the protected Room Usage Calendar page (/sewa/kalender).
+     */
+    public function calendarPortal(Request $request): View|RedirectResponse
+    {
+        if (! $request->session()->has('customer_id')) {
+            $request->session()->put('intended_sewa_url', $request->fullUrl());
+
+            return redirect()->route('customer.login')
+                ->with('auth_notice', 'Silakan masuk terlebih dahulu untuk melihat kalender pemakaian ruang.');
+        }
+
+        return view('customer.calendar');
+    }
+
+    /**
+     * Show the protected Booking History & Cancellation page (/sewa/riwayat).
+     */
+    public function historyPortal(Request $request): View|RedirectResponse
+    {
+        if (! $request->session()->has('customer_id')) {
+            $request->session()->put('intended_sewa_url', $request->fullUrl());
+
+            return redirect()->route('customer.login')
+                ->with('auth_notice', 'Silakan masuk terlebih dahulu untuk melihat riwayat pesanan Anda.');
+        }
+
+        return view('customer.history');
     }
 
     /**
@@ -79,25 +109,9 @@ class CustomerAuthController extends Controller
             return redirect()->route('admin.dashboard');
         }
 
-        // 2. Fallback auto-create akun demo penyewa jika database belum di-seed
-        if (! $user && $email === 'budi@ruangkita.id' && $password === 'password') {
-            $demoData = [
-                'name' => 'Budi Santoso',
-                'email' => 'budi@ruangkita.id',
-                'password' => Hash::make('password'),
-            ];
-            if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'phone')) {
-                $demoData['phone'] = '081234567890';
-            }
-            if ($hasRoleCol) {
-                $demoData['role'] = 'customer';
-            }
-            $user = User::create($demoData);
-        }
-
-        // 3. Jika yang login adalah Penyewa (Customer) -> arahkan langsung ke Halaman Sewa (/sewa)
+        // 2. Jika yang login adalah Penyewa (Customer) -> arahkan langsung ke Halaman Sewa (/sewa)
         if ($user && ! $isAdminAccount && Hash::check($password, $user->password)) {
-            $phone = $user->phone ?: ($email === 'budi@ruangkita.id' ? '081234567890' : $user->email);
+            $phone = $user->phone ?: $user->email;
             $request->session()->forget(['is_admin', 'admin_name', 'admin_email']);
             $request->session()->put('customer_id', $user->id);
             $request->session()->put('customer_name', $user->name);

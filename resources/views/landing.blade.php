@@ -378,9 +378,8 @@
             </div>
             <div class="flex flex-wrap items-center gap-4">
                 <a href="{{ route('booking.portal') }}" class="font-bold text-indigo-600 hover:underline">Halaman Sewa Ruang</a>
-                <a href="{{ route('customer.login') }}" class="hover:text-slate-800">Login Penyewa</a>
+                <a href="{{ route('customer.login') }}" class="hover:text-slate-800">Masuk Akun</a>
                 <a href="{{ route('customer.register') }}" class="hover:text-slate-800">Daftar Akun</a>
-                <a href="{{ route('admin.login') }}" class="hover:text-slate-800">Portal Admin</a>
             </div>
         </div>
     </footer>

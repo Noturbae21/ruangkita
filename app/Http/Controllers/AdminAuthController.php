@@ -11,7 +11,7 @@ use Illuminate\View\View;
 class AdminAuthController extends Controller
 {
     /**
-     * Show the Admin login page.
+     * Show the Admin login page (redirects to unified login page /login).
      */
     public function showLogin(Request $request): View|RedirectResponse
     {
@@ -19,7 +19,7 @@ class AdminAuthController extends Controller
             return redirect()->route('admin.dashboard');
         }
 
-        return view('admin.login');
+        return redirect()->route('customer.login');
     }
 
     /**
@@ -68,28 +68,60 @@ class AdminAuthController extends Controller
     }
 
     /**
-     * Display the Admin Coworking Dashboard (/admin).
+     * Render an authenticated Admin view with shared admin profile data.
      */
-    public function dashboard(Request $request): View|RedirectResponse
+    protected function renderAdminPage(Request $request, string $view): View|RedirectResponse
     {
         if ($request->session()->get('is_admin') !== true) {
-            return redirect()->route('admin.login')
-                ->withErrors(['email' => 'Silakan login sebagai Admin terlebih dahulu.']);
+            return redirect()->route('customer.login')
+                ->with('auth_notice', 'Silakan masuk sebagai Admin terlebih dahulu.');
         }
 
-        return view('admin.dashboard', [
+        return view($view, [
             'adminName' => $request->session()->get('admin_name', 'Admin RuangKita'),
             'adminEmail' => $request->session()->get('admin_email', 'admin@ruangkita.id'),
         ]);
     }
 
     /**
-     * Logout Admin session.
+     * Display the Admin Room Management page (/admin).
+     */
+    public function dashboard(Request $request): View|RedirectResponse
+    {
+        return $this->renderAdminPage($request, 'admin.rooms');
+    }
+
+    /**
+     * Display the Admin Additional Facilities (Add-ons) page (/admin/fasilitas).
+     */
+    public function facilities(Request $request): View|RedirectResponse
+    {
+        return $this->renderAdminPage($request, 'admin.facilities');
+    }
+
+    /**
+     * Display the Admin Bookings Management page (/admin/bookings).
+     */
+    public function bookings(Request $request): View|RedirectResponse
+    {
+        return $this->renderAdminPage($request, 'admin.bookings');
+    }
+
+    /**
+     * Display the Admin Operational Calendar page (/admin/kalender).
+     */
+    public function calendar(Request $request): View|RedirectResponse
+    {
+        return $this->renderAdminPage($request, 'admin.calendar');
+    }
+
+    /**
+     * Logout Admin session and redirect to Landing Page (/).
      */
     public function logout(Request $request): RedirectResponse
     {
         $request->session()->forget(['is_admin', 'admin_name', 'admin_email']);
 
-        return redirect()->route('admin.login');
+        return redirect()->route('home');
     }
 }

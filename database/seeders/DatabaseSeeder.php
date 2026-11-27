@@ -3,11 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\AdditionalFacility;
-use App\Models\Booking;
-use App\Models\BookingAdditionalFacility;
 use App\Models\Room;
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -16,10 +13,11 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-     * FR-14: Seed example data (at least 3 rooms, additional facilities, and several example bookings).
+     * Seed the application's master data (Admin account, Meeting Rooms, and Additional Facilities).
      */
     public function run(): void
     {
+        // 1. Akun Default Admin
         User::updateOrCreate(
             ['email' => 'admin@ruangkita.id'],
             [
@@ -30,17 +28,8 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $customerBudi = User::updateOrCreate(
-            ['email' => 'budi@ruangkita.id'],
-            [
-                'name' => 'Budi Santoso',
-                'phone' => '081234567890',
-                'role' => 'customer',
-                'password' => bcrypt('password'),
-            ]
-        );
-
-        $nusantara = Room::updateOrCreate(
+        // 2. Data Master Ruangan Meeting
+        Room::updateOrCreate(
             ['name' => 'Ruang Nusantara'],
             [
                 'capacity' => 12,
@@ -53,7 +42,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $garuda = Room::updateOrCreate(
+        Room::updateOrCreate(
             ['name' => 'Ruang Garuda'],
             [
                 'capacity' => 8,
@@ -66,7 +55,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $khatulistiwa = Room::updateOrCreate(
+        Room::updateOrCreate(
             ['name' => 'Ruang Khatulistiwa'],
             [
                 'capacity' => 6,
@@ -79,7 +68,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $merapi = Room::updateOrCreate(
+        Room::updateOrCreate(
             ['name' => 'Ruang Merapi'],
             [
                 'capacity' => 20,
@@ -92,8 +81,8 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // Seed Master Additional Facilities (Add-ons)
-        $coffeeBreak = AdditionalFacility::firstOrCreate(
+        // 3. Data Master Fasilitas Tambahan (Add-ons)
+        AdditionalFacility::updateOrCreate(
             ['name' => 'Paket Coffee Break & Snack'],
             [
                 'description' => 'Kopi, teh, air mineral, dan 2 macam kudapan per peserta',
@@ -103,7 +92,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $extraProjector = AdditionalFacility::firstOrCreate(
+        AdditionalFacility::updateOrCreate(
             ['name' => 'Proyektor & Layar Portable Ekstra'],
             [
                 'description' => 'Unit proyektor Full HD tambahan beserta layar tripod',
@@ -113,7 +102,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $webcamConference = AdditionalFacility::firstOrCreate(
+        AdditionalFacility::updateOrCreate(
             ['name' => 'Kamera Video Conference 360° & Speakerphone'],
             [
                 'description' => 'Set kamera omnidirectional + mikrofon speaker untuk hybrid meeting',
@@ -123,7 +112,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $flipchart = AdditionalFacility::firstOrCreate(
+        AdditionalFacility::updateOrCreate(
             ['name' => 'Papan Flipchart & Kertas A1 + Spidol'],
             [
                 'description' => 'Standing flipchart lengkap dengan 20 lembar kertas A1 dan spidol warna',
@@ -133,7 +122,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $cateringLunch = AdditionalFacility::firstOrCreate(
+        AdditionalFacility::updateOrCreate(
             ['name' => 'Paket Makan Siang Bento Eksekutif'],
             [
                 'description' => 'Nasi bento hangat lengkap dengan lauk utama, sayur, buah, dan minuman',
@@ -142,129 +131,6 @@ class DatabaseSeeder extends Seeder
                 'is_active' => true,
             ]
         );
-
-        if (Booking::count() === 0) {
-            $tomorrowWib = Carbon::now('Asia/Jakarta')->addDay()->startOfDay();
-            $dayAfterWib = $tomorrowWib->copy()->addDay();
-
-            // Example Booking 1: Tomorrow 09:00 - 11:00 WIB at Ruang Nusantara + Flipchart (PAID via QRIS)
-            $b1Code = 'RK-' . $tomorrowWib->format('Ymd') . '-B101';
-            $b1 = Booking::create([
-                'booking_code' => $b1Code,
-                'user_id' => $customerBudi->id,
-                'room_id' => $nusantara->id,
-                'booker_name' => 'Budi Santoso',
-                'booker_contact' => '081234567890',
-                'start_time' => $tomorrowWib->copy()->setTime(9, 0)->utc()->format('Y-m-d H:i:s'),
-                'end_time' => $tomorrowWib->copy()->setTime(11, 0)->utc()->format('Y-m-d H:i:s'),
-                'participants' => 10,
-                'room_price' => 400000,
-                'additional_facilities_price' => 45000,
-                'total_price' => 445000,
-                'payment_method' => Booking::PAYMENT_METHOD_QRIS,
-                'payment_status' => Booking::PAYMENT_STATUS_PAID,
-                'payment_reference' => 'QRIS-RK-B101A9F2',
-                'qris_payload' => \App\Services\BookingService::buildQrisPayload($b1Code, 445000),
-                'paid_at' => Carbon::now('UTC')->format('Y-m-d H:i:s'),
-                'status' => Booking::STATUS_CONFIRMED,
-                'penalty_amount' => 0,
-            ]);
-
-            BookingAdditionalFacility::create([
-                'booking_id' => $b1->id,
-                'additional_facility_id' => $flipchart->id,
-                'facility_name' => $flipchart->name,
-                'pricing_type' => $flipchart->pricing_type,
-                'unit_price' => $flipchart->price,
-                'quantity' => 1,
-                'subtotal' => 45000,
-            ]);
-
-            // Example Booking 2: Tomorrow 13:00 - 15:00 WIB at Ruang Nusantara (UNPAID QRIS)
-            $b2Code = 'RK-' . $tomorrowWib->format('Ymd') . '-S202';
-            Booking::create([
-                'booking_code' => $b2Code,
-                'room_id' => $nusantara->id,
-                'booker_name' => 'Siti Aminah',
-                'booker_contact' => 'siti@startup.id',
-                'start_time' => $tomorrowWib->copy()->setTime(13, 0)->utc()->format('Y-m-d H:i:s'),
-                'end_time' => $tomorrowWib->copy()->setTime(15, 0)->utc()->format('Y-m-d H:i:s'),
-                'participants' => 8,
-                'room_price' => 400000,
-                'additional_facilities_price' => 0,
-                'total_price' => 400000,
-                'payment_method' => Booking::PAYMENT_METHOD_QRIS,
-                'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
-                'payment_reference' => 'QRIS-RK-S202C4D1',
-                'qris_payload' => \App\Services\BookingService::buildQrisPayload($b2Code, 400000),
-                'payment_expired_at' => Carbon::now('UTC')->addMinutes(30)->format('Y-m-d H:i:s'),
-                'status' => Booking::STATUS_CONFIRMED,
-                'penalty_amount' => 0,
-            ]);
-
-            // Example Booking 3: Tomorrow 10:00 - 12:00 WIB at Ruang Garuda + Webcam Conference (PAID via QRIS)
-            $b3Code = 'RK-' . $tomorrowWib->format('Ymd') . '-A303';
-            $b3 = Booking::create([
-                'booking_code' => $b3Code,
-                'room_id' => $garuda->id,
-                'booker_name' => 'Andi Wijaya',
-                'booker_contact' => '081987654321',
-                'start_time' => $tomorrowWib->copy()->setTime(10, 0)->utc()->format('Y-m-d H:i:s'),
-                'end_time' => $tomorrowWib->copy()->setTime(12, 0)->utc()->format('Y-m-d H:i:s'),
-                'participants' => 6,
-                'room_price' => 300000,
-                'additional_facilities_price' => 100000,
-                'total_price' => 400000,
-                'payment_method' => Booking::PAYMENT_METHOD_QRIS,
-                'payment_status' => Booking::PAYMENT_STATUS_PAID,
-                'payment_reference' => 'QRIS-RK-A303E7B8',
-                'qris_payload' => \App\Services\BookingService::buildQrisPayload($b3Code, 400000),
-                'paid_at' => Carbon::now('UTC')->format('Y-m-d H:i:s'),
-                'status' => Booking::STATUS_CONFIRMED,
-                'penalty_amount' => 0,
-            ]);
-
-            BookingAdditionalFacility::create([
-                'booking_id' => $b3->id,
-                'additional_facility_id' => $webcamConference->id,
-                'facility_name' => $webcamConference->name,
-                'pricing_type' => $webcamConference->pricing_type,
-                'unit_price' => $webcamConference->price,
-                'quantity' => 1,
-                'subtotal' => 100000,
-            ]);
-
-            // Example Booking 4: Day after tomorrow 14:00 - 17:00 WIB at Ruang Merapi + Coffee Break (PAID via QRIS)
-            $b4Code = 'RK-' . $dayAfterWib->format('Ymd') . '-D404';
-            $b4 = Booking::create([
-                'booking_code' => $b4Code,
-                'room_id' => $merapi->id,
-                'booker_name' => 'Dewi Lestari',
-                'booker_contact' => 'dewi@techcorp.co.id',
-                'start_time' => $dayAfterWib->copy()->setTime(14, 0)->utc()->format('Y-m-d H:i:s'),
-                'end_time' => $dayAfterWib->copy()->setTime(17, 0)->utc()->format('Y-m-d H:i:s'),
-                'participants' => 18,
-                'room_price' => 1050000,
-                'additional_facilities_price' => 630000,
-                'total_price' => 1680000,
-                'payment_method' => Booking::PAYMENT_METHOD_QRIS,
-                'payment_status' => Booking::PAYMENT_STATUS_PAID,
-                'payment_reference' => 'QRIS-RK-D404F1C9',
-                'qris_payload' => \App\Services\BookingService::buildQrisPayload($b4Code, 1680000),
-                'paid_at' => Carbon::now('UTC')->format('Y-m-d H:i:s'),
-                'status' => Booking::STATUS_CONFIRMED,
-                'penalty_amount' => 0,
-            ]);
-
-            BookingAdditionalFacility::create([
-                'booking_id' => $b4->id,
-                'additional_facility_id' => $coffeeBreak->id,
-                'facility_name' => $coffeeBreak->name,
-                'pricing_type' => $coffeeBreak->pricing_type,
-                'unit_price' => $coffeeBreak->price,
-                'quantity' => 1,
-                'subtotal' => 630000,
-            ]);
-        }
     }
 }
+
